@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Newvu — Phylogenetic Tree Viewer</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+<!-- ── Brand bar ────────────────────────────────────────────── -->
+<div id="brandbar">
+  <span class="brand-name">newvu</span>
+</div>
+
+<!-- ── Toolbar ─────────────────────────────────────────────── -->
+<div id="toolbar">
+  <span id="title">Roseburia inulinivorans — predicted tree</span>
+
+  <div class="tb-sep"></div>
+
+  <div class="tb-group">
+    <span class="tb-cap">Tree</span>
+    <input type="file" id="nwk-upload" accept=".nwk,.newick,.tree,.txt">
+  </div>
+
+  <div class="tb-sep"></div>
+
+  <div class="tb-group">
+    <span class="tb-cap">Metadata</span>
+    <input type="file" id="meta-upload" accept=".tsv,.csv,.txt">
+  </div>
+
+  <div class="tb-sep"></div>
+
+  <div class="tb-group">
+    <span class="tb-cap">Color</span>
+    <select id="color-select"><option value="">— none —</option></select>
+  </div>
+
+  <div class="tb-sep"></div>
+
+  <div class="tb-group">
+    <span class="tb-cap">Label</span>
+    <select id="label-select"><option value="">— tip name —</option></select>
+  </div>
+
+  <div class="tb-sep"></div>
+
+  <label class="check-label">
+    <input type="checkbox" id="midpoint-chk"> Midpoint root
+  </label>
+
+  <div class="tb-sep"></div>
+
+  <div class="tb-group">
+    <span class="tb-cap">Width</span>
+    <button class="btn-icon" id="width-reset" title="Reset width">↺</button>
+    <button class="btn-icon" id="width-minus" title="Narrower">−</button>
+    <button class="btn-icon" id="width-plus"  title="Wider">+</button>
+  </div>
+</div>
+
+<!-- ── Status bar ──────────────────────────────────────────── -->
+<div id="statusbar">
+  <span id="hint">Click tips to select · Ctrl+drag to pan · Ctrl+scroll to zoom</span>
+  <span class="s-dot">·</span>
+  <div id="info"></div>
+</div>
+
+<!-- ── Tooltip ─────────────────────────────────────────────── -->
+<div id="tooltip"></div>
+
+<!-- ── Main workspace ──────────────────────────────────────── -->
+<div id="main-content">
+  <div id="right-panel">
+    <div id="tree"></div>
+    <div id="legend"></div>
+  </div>
+  <div id="divider"><button id="toggle-btn">◀</button></div>
+  <div id="left-panel">
+    <div id="left-header">
+      Plot <select id="boxplot-select"><option value="">— choose —</option></select>
+    </div>
+    <div id="boxplot"></div>
+  </div>
+</div>
+
+<script type="module" src="js/main.js"></script>
+</body>
+</html>
