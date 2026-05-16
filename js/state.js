@@ -16,4 +16,6 @@ export const state = {
   selectedNames:   new Set(), // Set<string> of currently selected tip names
   _tipG:           null,   // live d3 selection of tip <g> elements (set by draw)
   _leaves:         null,   // live array of hierarchy leaf nodes (set by draw)
+  originalNewick:  null,   // raw Newick string (for share link)
+  rawMeta:         null,   // raw TSV/CSV string (for share link)
 };

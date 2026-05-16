@@ -4,6 +4,7 @@ import { parseNewick, buildHierarchy, midpointRoot } from './newick.js';
 import { loadMeta, rebuildColorScale } from './meta.js';
 import { draw } from './render.js';
 import { drawBoxplot } from './boxplot.js';
+import { buildShareUrl, loadFromUrl } from './share.js';
 
 /* ══════════════════════════════════════════════════════════════════════════
    DEFAULT DATA
@@ -159,7 +160,8 @@ d3.select('#nwk-upload').on('change', function() {
   const file = this.files[0]; if (!file) return;
   const reader = new FileReader();
   reader.onload = e => {
-    state.originalData = parseNewick(e.target.result.trim());
+    state.originalNewick = e.target.result.trim();
+    state.originalData = parseNewick(state.originalNewick);
     d3.select('#title').text(file.name.replace(/\.[^.]+$/, ''));
     d3.select('#midpoint-chk').property('checked', false);
     state.currentData = state.originalData;
@@ -172,10 +174,11 @@ d3.select('#meta-upload').on('change', function() {
   const file = this.files[0]; if (!file) return;
   const reader = new FileReader();
   reader.onload = e => {
+    state.rawMeta = e.target.result;
     state.currentColorCol = null;
     state.currentLabelCol = null;
     state.colorScale = null;
-    loadMeta(e.target.result);
+    loadMeta(state.rawMeta);
     draw(state.currentData);
   };
   reader.readAsText(file);
@@ -214,10 +217,39 @@ d3.select('#midpoint-chk').on('change', function() {
 document.addEventListener('keydown', e => { if (e.key === 'Control') d3.select('#tree svg').classed('panning', true);  });
 document.addEventListener('keyup',   e => { if (e.key === 'Control') d3.select('#tree svg').classed('panning', false); });
 
+/* ── Share button ────────────────────────────────────────────────────────── */
+document.getElementById('share-btn').addEventListener('click', async () => {
+  const url = buildShareUrl();
+  await navigator.clipboard.writeText(url);
+  const btn = document.getElementById('share-btn');
+  const prev = btn.textContent;
+  btn.textContent = 'Copied!';
+  btn.disabled = true;
+  setTimeout(() => { btn.textContent = prev; btn.disabled = false; }, 1800);
+});
+
 /* ── Initial render ──────────────────────────────────────────────────────── */
-state.originalData = parseNewick(DEFAULT_NEWICK);
-state.currentData  = state.originalData;
-loadMeta(DEFAULT_META_TSV, 'genome');
+const shared = loadFromUrl();
+if (shared) {
+  state.originalNewick = shared.nwk;
+  state.originalData   = parseNewick(shared.nwk);
+  state.currentData    = state.originalData;
+  if (shared.title) d3.select('#title').text(shared.title);
+  if (shared.meta) {
+    state.rawMeta = shared.meta;
+    loadMeta(shared.meta, shared.color || null);
+    if (shared.label) {
+      state.currentLabelCol = shared.label;
+      d3.select('#label-select').property('value', shared.label);
+    }
+  }
+} else {
+  state.originalNewick = DEFAULT_NEWICK;
+  state.originalData   = parseNewick(DEFAULT_NEWICK);
+  state.currentData    = state.originalData;
+  state.rawMeta        = DEFAULT_META_TSV;
+  loadMeta(DEFAULT_META_TSV, 'genome');
+}
 draw(state.currentData);
 
 let _rafPending = false;
