@@ -5,6 +5,7 @@ import { loadMeta, rebuildColorScale } from './meta.js';
 import { draw } from './render.js';
 import { drawBoxplot } from './boxplot.js';
 import { buildShareUrl, loadFromUrl } from './share.js';
+import { exportZip } from './export.js';
 
 /* ══════════════════════════════════════════════════════════════════════════
    DEFAULT DATA
@@ -216,6 +217,9 @@ d3.select('#midpoint-chk').on('change', function() {
 // Ctrl held → show grab cursor so the pan mode change is obvious
 document.addEventListener('keydown', e => { if (e.key === 'Control') d3.select('#tree svg').classed('panning', true);  });
 document.addEventListener('keyup',   e => { if (e.key === 'Control') d3.select('#tree svg').classed('panning', false); });
+
+/* ── Export button ───────────────────────────────────────────────────────── */
+document.getElementById('export-btn').addEventListener('click', () => exportZip());
 
 /* ── Share button ────────────────────────────────────────────────────────── */
 document.getElementById('share-btn').addEventListener('click', async () => {

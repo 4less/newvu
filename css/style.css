@@ -175,6 +175,18 @@ button:hover { background: var(--primary-dk); }
 }
 .btn-icon:hover { background: var(--surface); color: var(--on-surface); }
 
+#export-btn {
+  font-size: 11px;
+  padding: 0 12px;
+  letter-spacing: 0.01em;
+  background: var(--surface-lowest);
+  color: var(--primary);
+  border: 1px solid var(--primary);
+}
+#export-btn:hover {
+  background: var(--surface-low);
+}
+
 #share-btn {
   font-size: 11px;
   padding: 0 12px;
