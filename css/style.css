@@ -2,20 +2,20 @@
    Newvu Scientific — design tokens
 ══════════════════════════════════════════════════════════════════════════ */
 :root {
-  --bg:              #f8f9ff;
+  --bg:              #f8fafc;
   --surface-lowest:  #ffffff;
-  --surface-low:     #eff4ff;
-  --surface:         #e5eeff;
-  --surface-high:    #dce9ff;
-  --surface-highest: #d3e4fe;
-  --on-surface:      #0b1c30;
-  --on-sv:           #3d4947;   /* on-surface-variant */
-  --outline:         #6d7a77;
-  --outline-v:       #bcc9c6;   /* outline-variant */
-  --primary:         #00685f;
-  --primary-dk:      #005049;
+  --surface-low:     #f1f5f9;
+  --surface:         #e2e8f0;
+  --surface-high:    #cbd5e1;
+  --surface-highest: #b6c4d4;
+  --on-surface:      #0f172a;
+  --on-sv:           #334155;
+  --outline:         #64748b;
+  --outline-v:       #cbd5e1;
+  --primary:         #4f46e5;
+  --primary-dk:      #4338ca;
   --on-primary:      #ffffff;
-  --secondary:       #4648d4;
+  --secondary:       #4f46e5;
   --toolbar-h:       48px;
   --status-h:        30px;
   --font-ui:         'Inter', system-ui, sans-serif;

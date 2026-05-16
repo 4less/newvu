@@ -163,7 +163,7 @@ export function draw(data) {
       .attr('cx', d => xScale(d.dist))
       .attr('cy', d => yScale(d.slot))
       .attr('r', 1.5)
-      .attr('fill', '#bcc9c6');
+      .attr('fill', '#cbd5e1');
 
   // Tips
   const tipG = svg.selectAll('.tip')
