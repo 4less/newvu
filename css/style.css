@@ -43,18 +43,38 @@ body {
 #brandbar {
   height: 40px;
   min-height: 40px;
-  background: var(--primary);
+  background: #1e293b;
   display: flex;
   align-items: center;
   padding: 0 16px;
+  gap: 14px;
   flex-shrink: 0;
 }
 
 .brand-name {
-  font-size: 18px;
+  font-size: 16px;
   font-weight: 700;
   letter-spacing: -0.02em;
-  color: var(--on-primary);
+  color: #ffffff;
+  flex-shrink: 0;
+}
+
+.brand-divider {
+  width: 1px;
+  height: 16px;
+  background: rgba(255, 255, 255, 0.2);
+  flex-shrink: 0;
+}
+
+#title {
+  font-size: 13px;
+  font-weight: 500;
+  font-style: italic;
+  letter-spacing: -0.01em;
+  color: rgba(255, 255, 255, 0.65);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 /* ══════════════════════════════════════════════════════════════════════════
@@ -70,15 +90,6 @@ body {
   padding: 0 14px;
   gap: 8px;
   flex-shrink: 0;
-}
-
-#title {
-  font-size: 13px;
-  font-weight: 600;
-  font-style: italic;
-  letter-spacing: -0.01em;
-  color: var(--on-surface);
-  white-space: nowrap;
 }
 
 .tb-sep {
@@ -279,6 +290,45 @@ button:hover { background: var(--primary-dk); }
   overflow: hidden;
 }
 
+/* ── Toolbox ─────────────────────────────────────────────────────────────── */
+#toolbox {
+  width: 44px;
+  min-width: 44px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 8px 4px;
+  gap: 3px;
+  background: var(--surface-low);
+  border-right: 1px solid var(--outline-v);
+  flex-shrink: 0;
+}
+
+.tool-btn {
+  width: 36px;
+  height: 36px;
+  border-radius: 6px;
+  background: transparent;
+  border: none;
+  color: var(--on-sv);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  flex-shrink: 0;
+}
+.tool-btn:hover  { background: var(--surface);  color: var(--on-surface); }
+.tool-btn.active { background: var(--primary); color: var(--on-primary); }
+.tool-btn.active:hover { background: var(--primary-dk); }
+
+/* Two-state icon switching */
+.tool-btn .icon-default,
+.tool-btn .icon-active  { display: flex; align-items: center; justify-content: center; }
+.tool-btn .icon-active          { display: none; }
+.tool-btn.active .icon-default  { display: none; }
+.tool-btn.active .icon-active   { display: flex; }
+
 /* ── Tree panel ──────────────────────────────────────────────────────────── */
 #right-panel {
   flex: 1;
@@ -293,19 +343,27 @@ button:hover { background: var(--primary-dk); }
   flex: 1;
   min-height: 0;
   overflow: auto;
+  position: relative;
 }
 svg { display: block; }
+/* In circular mode the SVG fills the container exactly — no scroll needed */
+#tree svg.circular { overflow: visible; }
 
 /* ── SVG tree elements ───────────────────────────────────────────────────── */
 .link     { fill: none; stroke: var(--outline-v); stroke-width: 0.9px; }
 .link-hit { fill: none; stroke: transparent; stroke-width: 10px; cursor: pointer; }
 
-svg.panning        { cursor: grab; }
-svg.panning:active { cursor: grabbing; }
+/* Tool cursors — listed least-to-most specific so .panning always wins */
+#tree svg.tool-select           { cursor: crosshair; }
+#tree svg.tool-zoomrect         { cursor: zoom-in; }
+#tree svg.tool-pan              { cursor: grab; }
+#tree svg.tool-pan:active       { cursor: grabbing; }
+/* Ctrl held (any tool) overrides to grab — must come after tool rules */
+#tree svg.panning               { cursor: grab; }
+#tree svg.panning:active        { cursor: grabbing; }
 
 .tip { cursor: pointer; }
-.tip circle { transition: r 0.1s; }
-.tip.selected circle { stroke: var(--on-surface); stroke-width: 1.5px; }
+.tip.selected path { stroke: var(--on-surface); stroke-width: 1.5px; }
 
 .tip-label {
   font-size: 11px;

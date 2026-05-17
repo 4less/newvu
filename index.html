@@ -14,14 +14,12 @@
 <!-- ── Brand bar ────────────────────────────────────────────── -->
 <div id="brandbar">
   <span class="brand-name">newvu</span>
+  <div class="brand-divider"></div>
+  <span id="title">Roseburia inulinivorans — predicted tree</span>
 </div>
 
 <!-- ── Toolbar ─────────────────────────────────────────────── -->
 <div id="toolbar">
-  <span id="title">Roseburia inulinivorans — predicted tree</span>
-
-  <div class="tb-sep"></div>
-
   <div class="tb-group">
     <span class="tb-cap">Tree</span>
     <input type="file" id="nwk-upload" accept=".nwk,.newick,.tree,.txt">
@@ -44,6 +42,11 @@
   <div class="tb-sep"></div>
 
   <div class="tb-group">
+    <span class="tb-cap">Shape</span>
+    <select id="shape-select"><option value="">— none —</option></select>
+  </div>
+
+  <div class="tb-group">
     <span class="tb-cap">Label</span>
     <select id="label-select"><option value="">— tip name —</option></select>
   </div>
@@ -52,6 +55,10 @@
 
   <label class="check-label">
     <input type="checkbox" id="midpoint-chk"> Midpoint root
+  </label>
+
+  <label class="check-label">
+    <input type="checkbox" id="circular-chk"> Circular
   </label>
 
   <div class="tb-sep"></div>
@@ -81,6 +88,79 @@
 
 <!-- ── Main workspace ──────────────────────────────────────── -->
 <div id="main-content">
+
+  <!-- ── Toolbox ───────────────────────────────────────────── -->
+  <div id="toolbox">
+
+    <!-- Pan -->
+    <button class="tool-btn" id="tool-pan" title="Pan — drag to move">
+      <!-- default: open hand, all 5 fingers -->
+      <span class="icon-default">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M5 10V12"/>
+          <path d="M8.5 7V12"/>
+          <path d="M12 5V12"/>
+          <path d="M15.5 7V12"/>
+          <path d="M19 10V12"/>
+          <path d="M3.5 12 Q11.5 21 20.5 12"/>
+        </svg>
+      </span>
+      <!-- active: grabbing fist -->
+      <span class="icon-active">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M5.5 10a1.5 1.5 0 0 1 3 0"/>
+          <path d="M9 10a1.5 1.5 0 0 1 3 0"/>
+          <path d="M12.5 10a1.5 1.5 0 0 1 3 0"/>
+          <path d="M16 10a1.5 1.5 0 0 1 2.5 0"/>
+          <path d="M4.5 10h14v2A7 7 0 0 1 4.5 12v-2z"/>
+          <path d="M4.5 12a3 3 0 0 0-3 1.2l2 1.5"/>
+        </svg>
+      </span>
+    </button>
+
+    <!-- Select -->
+    <button class="tool-btn active" id="tool-select" title="Select — drag to select tips">
+      <!-- default: dashed marquee + centre dot -->
+      <span class="icon-default">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round">
+          <rect x="3" y="3" width="18" height="18" rx="2" stroke-dasharray="4 3"/>
+          <circle cx="12" cy="12" r="1.5" fill="currentColor" stroke="none"/>
+        </svg>
+      </span>
+      <!-- active: dashed marquee + corner handles -->
+      <span class="icon-active">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round">
+          <rect x="3" y="3" width="18" height="18" rx="1" stroke-dasharray="4 3"/>
+          <rect x="1" y="1" width="4" height="4" rx="0.5" fill="currentColor" stroke="none"/>
+          <rect x="19" y="1" width="4" height="4" rx="0.5" fill="currentColor" stroke="none"/>
+          <rect x="1" y="19" width="4" height="4" rx="0.5" fill="currentColor" stroke="none"/>
+          <rect x="19" y="19" width="4" height="4" rx="0.5" fill="currentColor" stroke="none"/>
+        </svg>
+      </span>
+    </button>
+
+    <!-- Zoom to region -->
+    <button class="tool-btn" id="tool-zoomrect" title="Zoom to region — drag to zoom in · double-click to reset">
+      <!-- default: magnifier + plus -->
+      <span class="icon-default">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round">
+          <circle cx="10" cy="10" r="6.5"/>
+          <path d="M19 19l-3.5-3.5"/>
+          <path d="M10 7v6M7 10h6"/>
+        </svg>
+      </span>
+      <!-- active: magnifier + minus (double-click resets) -->
+      <span class="icon-active">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round">
+          <circle cx="10" cy="10" r="6.5"/>
+          <path d="M19 19l-3.5-3.5"/>
+          <path d="M7 10h6"/>
+        </svg>
+      </span>
+    </button>
+
+  </div>
+
   <div id="right-panel">
     <div id="tree"></div>
     <div id="legend"></div>

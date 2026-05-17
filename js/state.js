@@ -11,6 +11,8 @@ export const state = {
   currentLabelCol: null,   // which column replaces tip labels
   colorScale:      null,   // d3 colour scale (ordinal or sequential)
   isLogScale:      false,  // whether the sequential scale uses log spacing
+  shapeCol:        null,   // which column drives tip shape
+  shapeScale:      null,   // d3 ordinal scale: value → d3 symbol type
   boxplotCol:      null,   // column (or '__pairwise__') shown in the sidebar
   treeWidthDelta:  0,      // cumulative px adjustment from +/- width buttons
   selectedNames:   new Set(), // Set<string> of currently selected tip names
@@ -18,4 +20,7 @@ export const state = {
   _leaves:         null,   // live array of hierarchy leaf nodes (set by draw)
   originalNewick:  null,   // raw Newick string (for share link)
   rawMeta:         null,   // raw TSV/CSV string (for share link)
+  circularLayout:  false,  // true → radial/circular tree layout
+  activeTool:      'select', // 'pan' | 'select' | 'zoomrect'
+  zoomTransform:   null,   // preserved d3.ZoomTransform across redraws
 };

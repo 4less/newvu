@@ -1,7 +1,7 @@
 import * as d3 from 'https://cdn.jsdelivr.net/npm/d3@7/+esm';
 import { state } from './state.js';
 import { parseNewick, buildHierarchy, midpointRoot } from './newick.js';
-import { loadMeta, rebuildColorScale } from './meta.js';
+import { loadMeta, rebuildColorScale, rebuildShapeScale } from './meta.js';
 import { draw } from './render.js';
 import { drawBoxplot } from './boxplot.js';
 import { buildShareUrl, loadFromUrl } from './share.js';
@@ -165,7 +165,8 @@ d3.select('#nwk-upload').on('change', function() {
     state.originalData = parseNewick(state.originalNewick);
     d3.select('#title').text(file.name.replace(/\.[^.]+$/, ''));
     d3.select('#midpoint-chk').property('checked', false);
-    state.currentData = state.originalData;
+    state.currentData   = state.originalData;
+    state.zoomTransform = null;
     draw(state.currentData);
   };
   reader.readAsText(file);
@@ -191,6 +192,12 @@ d3.select('#color-select').on('change', function() {
   draw(state.currentData);
 });
 
+d3.select('#shape-select').on('change', function() {
+  state.shapeCol = this.value || null;
+  rebuildShapeScale();
+  draw(state.currentData);
+});
+
 d3.select('#label-select').on('change', function() {
   state.currentLabelCol = this.value || null;
   draw(state.currentData);
@@ -206,17 +213,35 @@ d3.select('#boxplot-select').on('change', function() {
 });
 
 d3.select('#midpoint-chk').on('change', function() {
-  if (this.checked) {
-    state.currentData = midpointRoot(buildHierarchy(state.originalData));
-  } else {
-    state.currentData = state.originalData;
-  }
+  state.currentData   = this.checked ? midpointRoot(buildHierarchy(state.originalData)) : state.originalData;
+  state.zoomTransform = null;
   draw(state.currentData);
 });
 
+d3.select('#circular-chk').on('change', function() {
+  state.circularLayout  = this.checked;
+  state.zoomTransform   = null;           // coordinate system changes
+  draw(state.currentData);
+});
+
+/* ── Toolbox ─────────────────────────────────────────────────────────────── */
+['pan', 'select', 'zoomrect'].forEach(tool => {
+  document.getElementById(`tool-${tool}`).addEventListener('click', () => {
+    state.activeTool = tool;
+    document.querySelectorAll('.tool-btn').forEach(b => b.classList.remove('active'));
+    document.getElementById(`tool-${tool}`).classList.add('active');
+    draw(state.currentData);  // redraw preserves zoomTransform
+  });
+});
+
 // Ctrl held → show grab cursor so the pan mode change is obvious
-document.addEventListener('keydown', e => { if (e.key === 'Control') d3.select('#tree svg').classed('panning', true);  });
-document.addEventListener('keyup',   e => { if (e.key === 'Control') d3.select('#tree svg').classed('panning', false); });
+document.addEventListener('keydown', e => {
+  if (e.key === 'Control' && state.activeTool !== 'pan')
+    d3.select('#tree svg').classed('panning', true);
+});
+document.addEventListener('keyup', e => {
+  if (e.key === 'Control') d3.select('#tree svg').classed('panning', false);
+});
 
 /* ── Export button ───────────────────────────────────────────────────────── */
 document.getElementById('export-btn').addEventListener('click', () => exportZip());
