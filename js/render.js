@@ -2,19 +2,18 @@ import * as d3 from 'https://cdn.jsdelivr.net/npm/d3@7/+esm';
 import { state } from './state.js';
 import { buildHierarchy } from './newick.js';
 import { updateStats, clearSelection } from './stats.js';
+import { SHAPES } from './meta.js';
 
-/* helper — always creates a fresh generator to avoid shared-state mutation */
 const sym = (type, size = 64) => d3.symbol().type(type).size(size)();
 
 /* ══════════════════════════════════════════════════════════════════════════
-   LEGEND (categorical or continuous colour scale)
+   LEGEND  (always renders into #legend — shared across trees)
 ══════════════════════════════════════════════════════════════════════════ */
 function buildLegend() {
   const leg = d3.select('#legend');
   leg.selectAll('*').remove();
   if (!state.colorScale && !state.shapeScale) return;
 
-  /* shape-only legend (no color column selected) */
   if (!state.colorScale && state.shapeScale) {
     state.shapeScale.domain().forEach(val => {
       const item = leg.append('div').attr('class', 'legend-item');
@@ -31,7 +30,6 @@ function buildLegend() {
 
   if (!state.colorScale || !state.colorScale.domain) return;
 
-  /* continuous (gradient) legend */
   if (typeof state.colorScale.domain()[0] !== 'string') {
     const [lo, hi] = state.colorScale.domain();
     const valAt = t => state.isLogScale ? lo * Math.pow(hi / lo, t) : lo + t * (hi - lo);
@@ -49,9 +47,7 @@ function buildLegend() {
     return;
   }
 
-  /* categorical legend — SVG symbol swatches */
   const sameCol = state.shapeScale && state.shapeCol === state.currentColorCol;
-
   state.colorScale.domain().forEach(val => {
     const item  = leg.append('div').attr('class', 'legend-item');
     const color = state.colorScale(val);
@@ -64,62 +60,86 @@ function buildLegend() {
         .attr('fill', color).attr('opacity', 0.85);
     item.append('span').text(val);
     item.on('click', () => {
-      const matching = [...state.currentMeta.entries()]
-        .filter(([, row]) => row[state.currentColorCol] === val)
-        .map(([name]) => name);
-      const allSelected = matching.length > 0 && matching.every(n => state.selectedNames.has(n));
-      if (allSelected) {
-        matching.forEach(n => state.selectedNames.delete(n));
-      } else {
-        matching.forEach(n => state.selectedNames.add(n));
-      }
-      if (state._tipG) state._tipG.classed('selected', n => state.selectedNames.has(n.data.name));
-      updateStats();
+      // Legend click selects matching tips in the ACTIVE tree.
+      // Match by checking each tree tip directly: either its metadata color
+      // column equals val, or its name itself equals val (when tips are named
+      // by the color value, e.g. genome accessions in the comparison tree).
+      const ts = state.activeTree;
+      if (!ts) return;
+      const matching = (ts._leaves || [])
+        .map(l => l.data.name)
+        .filter(name => {
+          const row = state.currentMeta?.get(name.trim());
+          if (row && state.currentColorCol) return row[state.currentColorCol] === val;
+          return name.trim() === val;
+        });
+      const allSelected = matching.length > 0 && matching.every(n => ts.selectedNames.has(n));
+      if (allSelected) matching.forEach(n => ts.selectedNames.delete(n));
+      else             matching.forEach(n => ts.selectedNames.add(n));
+      if (ts._tipG) ts._tipG.classed('selected', n => ts.selectedNames.has(n.data.name));
+      updateStats(ts);
     });
   });
 }
 
 /* ══════════════════════════════════════════════════════════════════════════
    TREE RENDER
+   treeState  — per-tree state instance (from treeState.js)
+   containerId — id of the .tree-canvas <div> ('tree' or 'tree2')
 ══════════════════════════════════════════════════════════════════════════ */
-export function draw(data) {
-  const circular = state.circularLayout;
+export function draw(treeState, containerId = 'tree') {
+  const circular = treeState.circularLayout;
 
-  const root    = buildHierarchy(data);
+  const root    = buildHierarchy(treeState.currentData);
   const leaves  = root.leaves();
-  state._leaves = leaves;
+  treeState._leaves = leaves;
   const nLeaves = leaves.length;
   const maxDist = d3.max(leaves, d => d.dist);
 
-  const container = document.getElementById('tree');
+  const container = document.getElementById(containerId);
+  if (!container) return;
 
-  /* ── Layout-specific scales & dimensions ─────────────────────────────── */
-  let svgW, svgH, initTransform;
-  let rScale, aScale, maxR;
-
-  // Store margin / spacing for use in brush extent and scale bar
-  const margin  = { top: 20, right: 230, bottom: 50, left: 20 };
+  /* ── Layout ───────────────────────────────────────────────────────────── */
   const spacing = 10;
-  let treeW, xScale, yScale;
+  let svgW, svgH, initTransform;
+  let rScale, aScale, maxR, labelPad, treeW, xScale, yScale;
+  let margin = { top: 20, right: 230, bottom: 50, left: 20 };
 
   if (circular) {
-    const labelPad = 190;
-    maxR   = Math.max(40, Math.min(container.clientWidth, container.clientHeight) / 2 - labelPad);
-    svgW   = container.clientWidth;
-    svgH   = container.clientHeight;
+    // Label padding scales with the shorter container dimension so the tree
+    // circle and labels shrink proportionally when the panel opens.
+    const minDim = Math.min(container.clientWidth, container.clientHeight);
+    labelPad = Math.max(60, Math.min(190, minDim * 0.32));
+    maxR  = Math.max(40, minDim / 2 - labelPad);
+    svgW  = container.clientWidth;
+    svgH  = container.clientHeight;
+    // Clip instead of scroll — circular trees always fit the container.
+    container.style.overflow = 'hidden';
     rScale = d3.scaleLinear().domain([0, maxDist]).range([0, maxR]);
     aScale = d3.scaleLinear().domain([0, nLeaves]).range([-Math.PI / 2, 3 * Math.PI / 2]);
     initTransform = d3.zoomIdentity.translate(svgW / 2, svgH / 2);
   } else {
-    treeW  = Math.max(80, container.clientWidth - margin.left - margin.right + state.treeWidthDelta);
-    svgW   = treeW + margin.left + margin.right;
-    svgH   = nLeaves * spacing + margin.top + margin.bottom;
+    // Right margin (label space) is proportional to container width so the tree
+    // branches don't collapse to nothing when the panel opens.
+    const rightMargin = Math.max(80, Math.min(230, container.clientWidth * 0.42));
+    margin = { top: 20, right: rightMargin, bottom: 50, left: 20 };
+    container.style.overflow = 'auto';
+    treeW = Math.max(80, container.clientWidth - margin.left - margin.right + treeState.treeWidthDelta);
+    svgW  = treeW + margin.left + margin.right;
+    svgH  = nLeaves * spacing + margin.top + margin.bottom;
     xScale = d3.scaleLinear().domain([0, maxDist]).range([0, treeW]);
     yScale = d3.scaleLinear().domain([0, nLeaves - 1]).range([0, nLeaves * spacing - spacing]);
     initTransform = d3.zoomIdentity.translate(margin.left, margin.top);
   }
 
-  /* ── Pre-compute per-node Cartesian positions ─────────────────────────── */
+  // In circular mode, scale font and tip size proportionally with the container
+  // so labels and markers shrink/grow together with the tree circle.
+  const _refDim = 600;
+  const _scale  = circular ? Math.max(0.3, Math.min(1.5, Math.min(container.clientWidth, container.clientHeight) / _refDim)) : 1;
+  const effectiveFontSize = Math.max(4, Math.round(state.tipFontSize * _scale));
+  const effectiveTipSize  = Math.max(6, Math.round(state.tipSize  * _scale));
+
+  /* ── Node positions ───────────────────────────────────────────────────── */
   root.each(node => {
     if (circular) {
       node.angle  = aScale(node.slot);
@@ -133,11 +153,10 @@ export function draw(data) {
   });
 
   /* ── Link path ────────────────────────────────────────────────────────── */
-  function rectLink(d) {
-    return `M${d.parent.px},${d.parent.py} V${d.py} H${d.px}`;
-  }
+  const rectLink = d =>
+    `M${d.parent.px},${d.parent.py} V${d.py} H${d.px}`;
 
-  function circLink(d) {
+  const circLink = d => {
     const pR = d.parent.radius, pA = d.parent.angle;
     const cR = d.radius,        cA = d.angle;
     const p1x = pR * Math.cos(pA), p1y = pR * Math.sin(pA);
@@ -146,16 +165,44 @@ export function draw(data) {
     if (pR < 1e-9) return `M0,0 L${p3x},${p3y}`;
     const dA = cA - pA;
     return `M${p1x},${p1y} A${pR},${pR} 0 ${Math.abs(dA) > Math.PI ? 1 : 0},${dA > 0 ? 1 : 0} ${p2x},${p2y} L${p3x},${p3y}`;
-  }
+  };
 
   const linkPath = circular ? circLink : rectLink;
 
   /* ── Tip helpers ──────────────────────────────────────────────────────── */
+  // Pre-build a Set of colour-domain values for O(1) look-up inside tipColor.
+  const colorDomainSet = (state.colorScale && typeof state.colorScale.domain()[0] === 'string')
+    ? new Set(state.colorScale.domain())
+    : null;
+
   function tipColor(name) {
     if (!state.colorScale || !state.currentMeta || !state.currentColorCol) return '#888';
-    const row = state.currentMeta.get(name);
-    if (!row) return '#bbb';
-    return state.colorScale(row[state.currentColorCol]);
+
+    // Trim whitespace that can sneak in from Newick files.
+    const key = name.trim();
+
+    // Primary: look up by the metadata ID column (standard case — tree 1).
+    const row = state.currentMeta.get(key);
+    if (row) return state.colorScale(row[state.currentColorCol]);
+
+    // Fallback A: tip name is itself a colour-column value (categorical scales only).
+    // Covers tree 2 whose tips are named by e.g. genome accession when
+    // "Color by: genome" is active — they receive the same colour as the
+    // matching samples in tree 1.
+    if (colorDomainSet && colorDomainSet.has(key)) return state.colorScale(key);
+
+    // Fallback B: strip trailing version suffix (e.g. ".1") and retry.
+    // Handles minor version mismatches between tree file and metadata.
+    if (colorDomainSet) {
+      const noVersion = key.replace(/\.\d+$/, '');
+      if (noVersion !== key) {
+        for (const v of colorDomainSet) {
+          if (v.replace(/\.\d+$/, '') === noVersion) return state.colorScale(v);
+        }
+      }
+    }
+
+    return '#bbb';
   }
 
   function tipShape(name) {
@@ -173,53 +220,58 @@ export function draw(data) {
     return val !== undefined && val !== '' ? `${val}  (${name})` : name;
   }
 
-  /* ── Build SVG ────────────────────────────────────────────────────────── */
-  d3.select('#tree').selectAll('svg').remove();
-  const svgEl = d3.select('#tree').append('svg')
+  /* ── SVG ──────────────────────────────────────────────────────────────── */
+  d3.select(`#${containerId}`).selectAll('svg').remove();
+  const svgEl = d3.select(`#${containerId}`).append('svg')
     .attr('width', svgW).attr('height', svgH)
-    .classed('circular',     circular)
-    .classed('tool-pan',     state.activeTool === 'pan')
-    .classed('tool-select',  state.activeTool === 'select')
+    .classed('circular',      circular)
+    .classed('tool-pan',      state.activeTool === 'pan')
+    .classed('tool-select',   state.activeTool === 'select')
     .classed('tool-zoomrect', state.activeTool === 'zoomrect');
 
   const svg = svgEl.append('g');
 
-  /* ── Zoom (tool-aware filter) ─────────────────────────────────────────── */
+  /* ── Zoom ─────────────────────────────────────────────────────────────── */
   const zoom = d3.zoom()
     .filter(event => {
-      if (event.type === 'wheel') return event.ctrlKey;      // scroll only zooms with Ctrl
-      if (state.activeTool === 'pan') return !event.button;  // pan: any drag
-      return event.ctrlKey && !event.button;                 // others: ctrl+drag
+      if (event.type === 'wheel')        return event.ctrlKey;
+      if (state.activeTool === 'pan')    return !event.button;
+      return event.ctrlKey && !event.button;
     })
     .wheelDelta(event => -event.deltaY * (event.deltaMode === 1 ? 0.02 : event.deltaMode ? 1 : 0.0005))
     .scaleExtent([0.1, 10])
     .on('zoom', event => {
-      state.zoomTransform = event.transform;
+      treeState.zoomTransform = event.transform;
       svg.attr('transform', event.transform);
     });
 
-  svgEl.call(zoom)
-       .call(zoom.transform, state.zoomTransform ?? initTransform);
+  svgEl.call(zoom).call(zoom.transform, treeState.zoomTransform ?? initTransform);
 
-  // Double-click resets zoom to initial view
+  // Remove D3's default dblclick-zoom; replace with full reset
   svgEl.on('dblclick.zoom', null);
   svgEl.on('dblclick', () => {
-    state.zoomTransform = null;
+    treeState.zoomTransform = null;
     svgEl.transition().duration(350).call(zoom.transform, initTransform);
   });
 
-  /* ── Brush (tool-aware) ───────────────────────────────────────────────── */
+  // Click on empty SVG space → clear selection.
+  // Tips and link-hit paths call stopPropagation(), so they never reach here.
+  svgEl.on('click.deselect', () => {
+    if (state.activeTool !== 'pan') clearSelection(treeState);
+  });
+
+  /* ── Brush ────────────────────────────────────────────────────────────── */
   const brushG = svg.insert('g', ':first-child').attr('class', 'brush');
 
   const brushExtent = circular
-    ? [[-maxR - 190, -maxR - 190], [maxR + 190, maxR + 190]]
+    ? [[-maxR - labelPad, -maxR - labelPad], [maxR + labelPad, maxR + labelPad]]
     : [[0, -spacing], [treeW + margin.right, nLeaves * spacing]];
 
   const brush = d3.brush()
     .filter(event => {
-      if (state.activeTool === 'pan')  return false;  // pan tool owns all drags
-      if (event.type === 'wheel')      return false;
-      if (event.ctrlKey || event.button) return false;
+      if (state.activeTool === 'pan')        return false;
+      if (event.type === 'wheel')            return false;
+      if (event.ctrlKey || event.button)     return false;
       return true;
     })
     .extent(brushExtent)
@@ -227,35 +279,32 @@ export function draw(data) {
       if (!event.sourceEvent) return;
       const sel = event.selection;
 
-      /* ── Zoom-to-rect tool ── */
       if (state.activeTool === 'zoomrect') {
         brushG.call(brush.move, null);
         if (!sel) {
-          // Empty click → reset zoom
-          state.zoomTransform = null;
+          treeState.zoomTransform = null;
           svgEl.transition().duration(350).call(zoom.transform, initTransform);
           return;
         }
         const [[x0, y0], [x1, y1]] = sel;
-        const selW = Math.max(x1 - x0, 1), selH = Math.max(y1 - y0, 1);
-        const k   = Math.min(svgW / selW, svgH / selH, zoom.scaleExtent()[1]) * 0.85;
-        const cx  = (x0 + x1) / 2, cy = (y0 + y1) / 2;
-        const t   = d3.zoomIdentity.translate(svgW / 2 - k * cx, svgH / 2 - k * cy).scale(k);
-        state.zoomTransform = t;
+        const k = Math.min(svgW / Math.max(x1 - x0, 1), svgH / Math.max(y1 - y0, 1), zoom.scaleExtent()[1]) * 0.85;
+        const t = d3.zoomIdentity.translate(svgW / 2 - k * ((x0 + x1) / 2), svgH / 2 - k * ((y0 + y1) / 2)).scale(k);
+        treeState.zoomTransform = t;
         svgEl.transition().duration(350).call(zoom.transform, t);
         return;
       }
 
-      /* ── Select tool ── */
-      if (!sel) { clearSelection(); return; }
+      // Null selection = single click on empty SVG space. Let click.deselect handle it;
+      // removing it here prevents the brush from accidentally undoing legend selections.
+      if (!sel) return;
       const [[x0, y0], [x1, y1]] = sel;
       leaves.forEach(l => {
         if (l.px >= x0 && l.px <= x1 && l.py >= y0 && l.py <= y1)
-          state.selectedNames.add(l.data.name);
+          treeState.selectedNames.add(l.data.name);
       });
       brushG.call(brush.move, null);
-      if (state._tipG) state._tipG.classed('selected', n => state.selectedNames.has(n.data.name));
-      updateStats();
+      if (treeState._tipG) treeState._tipG.classed('selected', n => treeState.selectedNames.has(n.data.name));
+      updateStats(treeState);
     });
 
   brushG.call(brush);
@@ -271,9 +320,9 @@ export function draw(data) {
       .attr('class', 'link-hit').attr('d', linkPath)
       .on('click', function(event, d) {
         event.stopPropagation();
-        d.leaves().forEach(l => state.selectedNames.add(l.data.name));
-        if (state._tipG) state._tipG.classed('selected', n => state.selectedNames.has(n.data.name));
-        updateStats();
+        d.leaves().forEach(l => treeState.selectedNames.add(l.data.name));
+        if (treeState._tipG) treeState._tipG.classed('selected', n => treeState.selectedNames.has(n.data.name));
+        updateStats(treeState);
       });
 
   /* ── Internal node dots ───────────────────────────────────────────────── */
@@ -290,35 +339,35 @@ export function draw(data) {
     .join('g')
       .attr('class', 'tip')
       .attr('transform', d => `translate(${d.px},${d.py})`);
-  state._tipG = tipG;
+  treeState._tipG = tipG;
 
   tipG.append('path')
-    .attr('d', d => sym(tipShape(d.data.name)))
+    .attr('d', d => sym(tipShape(d.data.name), effectiveTipSize))
     .attr('fill', d => tipColor(d.data.name))
     .attr('opacity', 0.85);
 
   tipG.append('text')
     .attr('class', 'tip-label')
+    .style('font-size', effectiveFontSize + 'px')
     .attr('transform', d => {
       if (!circular) return null;
-      const deg  = d.angle * 180 / Math.PI;
-      const flip = Math.cos(d.angle) < 0;
-      return `rotate(${deg + (flip ? 180 : 0)})`;
+      const deg = d.angle * 180 / Math.PI;
+      return `rotate(${deg + (Math.cos(d.angle) < 0 ? 180 : 0)})`;
     })
     .attr('x', d => circular ? (Math.cos(d.angle) < 0 ? -8 : 8) : 8)
     .attr('text-anchor', d => circular && Math.cos(d.angle) < 0 ? 'end' : 'start')
     .attr('fill', d => tipColor(d.data.name))
     .text(d => tipLabel(d.data.name));
 
-  tipG.classed('selected', d => state.selectedNames.has(d.data.name));
+  tipG.classed('selected', d => treeState.selectedNames.has(d.data.name));
 
   tipG.on('click', function(event, d) {
     event.stopPropagation();
     const name = d.data.name;
-    if (state.selectedNames.has(name)) state.selectedNames.delete(name);
-    else state.selectedNames.add(name);
-    d3.select(this).classed('selected', state.selectedNames.has(name));
-    updateStats();
+    if (treeState.selectedNames.has(name)) treeState.selectedNames.delete(name);
+    else treeState.selectedNames.add(name);
+    d3.select(this).classed('selected', treeState.selectedNames.has(name));
+    updateStats(treeState);
   });
 
   const tooltip = d3.select('#tooltip');
@@ -338,8 +387,8 @@ export function draw(data) {
       const x = event.clientX + 14, y = event.clientY - 10;
       const tw = tooltip.node().offsetWidth;
       tooltip
-        .style('left',  (x + tw > window.innerWidth ? x - tw - 20 : x) + 'px')
-        .style('top',   y + 'px');
+        .style('left', (x + tw > window.innerWidth ? x - tw - 20 : x) + 'px')
+        .style('top', y + 'px');
     })
     .on('mouseout', () => tooltip.style('display', 'none'));
 
@@ -348,15 +397,13 @@ export function draw(data) {
   const barG = svg.append('g').attr('class', 'scalebar');
 
   if (circular) {
-    const barW = rScale(scaleVal);
-    const barY = maxR + 20;
+    const barW = rScale(scaleVal), barY = maxR + 20;
     barG.append('line').attr('x1', -barW / 2).attr('x2', barW / 2).attr('y1', barY).attr('y2', barY);
     barG.append('line').attr('x1', -barW / 2).attr('x2', -barW / 2).attr('y1', barY - 4).attr('y2', barY + 4);
     barG.append('line').attr('x1',  barW / 2).attr('x2',  barW / 2).attr('y1', barY - 4).attr('y2', barY + 4);
     barG.append('text').attr('x', 0).attr('y', barY + 14).text(scaleVal);
   } else {
-    const barY = nLeaves * spacing + 10;
-    const bx   = xScale(scaleVal);
+    const barY = nLeaves * spacing + 10, bx = xScale(scaleVal);
     barG.append('line').attr('x1', 0).attr('x2', bx).attr('y1', barY).attr('y2', barY);
     barG.append('line').attr('x1', 0).attr('x2', 0).attr('y1', barY - 4).attr('y2', barY + 4);
     barG.append('line').attr('x1', bx).attr('x2', bx).attr('y1', barY - 4).attr('y2', barY + 4);
@@ -364,5 +411,5 @@ export function draw(data) {
   }
 
   buildLegend();
-  updateStats();
+  updateStats(treeState);
 }

@@ -2,9 +2,11 @@ import * as d3 from 'https://cdn.jsdelivr.net/npm/d3@7/+esm';
 import { state } from './state.js';
 
 /* ══════════════════════════════════════════════════════════════════════════
-   BOXPLOT (sidebar panel)
+   BOXPLOT  (sidebar panel — driven by a specific treeState)
 ══════════════════════════════════════════════════════════════════════════ */
+/* Boxplot always reflects the primary (left) tree — state.primaryTree. */
 export function drawBoxplot() {
+  const treeState = state.primaryTree;
   const panel     = document.getElementById('left-panel');
   const container = d3.select('#boxplot');
   container.selectAll('*').remove();
@@ -15,7 +17,14 @@ export function drawBoxplot() {
     container.append('div').attr('class', 'bp-placeholder').text('Choose a variable above to plot.');
     return;
   }
-  if (state.selectedNames.size === 0) {
+
+  // Pairwise comparison uses ALL tips — no selection required.
+  if (state.boxplotCol === '__pairwise_comparison__') {
+    drawPairwiseScatter(container, treeState, panel);
+    return;
+  }
+
+  if (!treeState || treeState.selectedNames.size === 0) {
     container.append('div').attr('class', 'bp-placeholder').text('Select tips in the tree to see the distribution.');
     return;
   }
@@ -26,7 +35,7 @@ export function drawBoxplot() {
 
   if (state.boxplotCol === '__pairwise__') {
     yLabel = 'Cophenetic distance';
-    const selLeaves = (state._leaves || []).filter(l => state.selectedNames.has(l.data.name));
+    const selLeaves = (treeState._leaves || []).filter(l => treeState.selectedNames.has(l.data.name));
     if (selLeaves.length < 2) {
       container.append('div').attr('class', 'bp-placeholder').text('Select at least 2 tips to compute pairwise distances.');
       return;
@@ -51,7 +60,7 @@ export function drawBoxplot() {
       container.append('div').attr('class', 'bp-placeholder').text('Load metadata to plot this variable.');
       return;
     }
-    pts = [...state.selectedNames].flatMap(name => {
+    pts = [...treeState.selectedNames].flatMap(name => {
       const row = state.currentMeta.get(name);
       if (!row) return [];
       const val = +row[state.boxplotCol];
@@ -121,22 +130,167 @@ export function drawBoxplot() {
       svg.append('line').attr('x1', cx - capW / 2).attr('x2', cx + capW / 2)
         .attr('y1', ySc(v)).attr('y2', ySc(v)).attr('stroke', c).attr('stroke-width', 1.5)
     );
-
     svg.append('rect').attr('x', bx).attr('y', ySc(g.q3))
       .attr('width', bw).attr('height', Math.max(0, ySc(g.q1) - ySc(g.q3)))
       .attr('fill', c).attr('fill-opacity', 0.22).attr('stroke', c).attr('stroke-width', 1.5);
-
     svg.append('line').attr('x1', bx).attr('x2', bx + bw)
       .attr('y1', ySc(g.median)).attr('y2', ySc(g.median))
       .attr('stroke', c).attr('stroke-width', 2.5);
-
     g.outliers.forEach(v =>
       svg.append('circle').attr('cx', cx).attr('cy', ySc(v)).attr('r', 2.5)
         .attr('fill', 'none').attr('stroke', c).attr('stroke-width', 1)
     );
-
     svg.append('text').attr('x', cx).attr('y', ySc(g.wHi) - 5)
       .attr('text-anchor', 'middle').attr('font-size', 9).attr('fill', '#999')
       .text(`n=${g.n}`);
   });
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   PAIRWISE DISTANCE SCATTER PLOT  (prediction vs reference)
+   — Matched via metadata colour column (sample → genome).
+   — Intra-genome pairs always get reference distance = 0.
+══════════════════════════════════════════════════════════════════════════ */
+function drawPairwiseScatter(container, treeState, panel) {
+  const tree2 = state.secondaryTree;
+
+  if (!tree2 || !tree2._leaves || tree2._leaves.length === 0) {
+    container.append('div').attr('class', 'bp-placeholder')
+      .text('Load a comparison tree to enable this plot.');
+    return;
+  }
+  if (!state.currentColorCol || !state.currentMeta) {
+    container.append('div').attr('class', 'bp-placeholder')
+      .text('Select a colour column to match samples to genomes.');
+    return;
+  }
+
+  // Use ALL leaves — no selection required.
+  const allLeaves = treeState?._leaves || [];
+  if (allLeaves.length < 2) {
+    container.append('div').attr('class', 'bp-placeholder')
+      .text('Load a prediction tree first.');
+    return;
+  }
+
+  // genome → tree2 leaf node (pre-cached ancestors for LCA)
+  const t2map = new Map();
+  for (const leaf of tree2._leaves) t2map.set(leaf.data.name.trim(), leaf);
+
+  // Pre-cache tree2 ancestors per leaf for O(depth) LCA lookups
+  const t2ancs = new Map();
+  for (const [name, leaf] of t2map) t2ancs.set(name, new Set(leaf.ancestors()));
+
+  const getGenome = name => state.currentMeta.get(name.trim())?.[state.currentColorCol]?.trim() ?? null;
+
+  // Pre-cache tree1 ancestor sets so inner loop is O(depth) not O(depth²)
+  const t1ancs = allLeaves.map(l => new Set(l.ancestors()));
+
+  // Pre-cache tree2 distances between genome pairs (memoised)
+  const t2distCache = new Map();
+  function t2dist(g1, g2) {
+    const key = g1 < g2 ? `${g1}\0${g2}` : `${g2}\0${g1}`;
+    if (t2distCache.has(key)) return t2distCache.get(key);
+    const l1 = t2map.get(g1), l2 = t2map.get(g2);
+    if (!l1 || !l2) { t2distCache.set(key, null); return null; }
+    const lca = l2.ancestors().find(n => t2ancs.get(g1).has(n));
+    if (!lca) { t2distCache.set(key, null); return null; }
+    const d = l1.dist + l2.dist - 2 * lca.dist;
+    t2distCache.set(key, d);
+    return d;
+  }
+
+  const pts = [];
+  for (let i = 0; i < allLeaves.length; i++) {
+    const g1 = getGenome(allLeaves[i].data.name);
+    for (let j = i + 1; j < allLeaves.length; j++) {
+      const g2 = getGenome(allLeaves[j].data.name);
+      if (!g1 || !g2) continue;
+
+      const lca1 = allLeaves[j].ancestors().find(n => t1ancs[i].has(n));
+      if (!lca1) continue;
+      const xDist = allLeaves[i].dist + allLeaves[j].dist - 2 * lca1.dist;
+
+      let yDist;
+      if (g1 === g2) {
+        yDist = 0;
+      } else {
+        yDist = t2dist(g1, g2);
+        if (yDist === null) continue;
+      }
+      pts.push({ x: xDist, y: yDist, same: g1 === g2 });
+    }
+  }
+
+  if (!pts.length) {
+    container.append('div').attr('class', 'bp-placeholder')
+      .text('No matching genome pairs found between the two trees.');
+    return;
+  }
+
+  // Pearson r
+  const n     = pts.length;
+  const xMean = d3.mean(pts, d => d.x);
+  const yMean = d3.mean(pts, d => d.y);
+  const num   = d3.sum(pts, d => (d.x - xMean) * (d.y - yMean));
+  const denX  = Math.sqrt(d3.sum(pts, d => (d.x - xMean) ** 2));
+  const denY  = Math.sqrt(d3.sum(pts, d => (d.y - yMean) ** 2));
+  const pearsonR = (denX && denY) ? num / (denX * denY) : 0;
+
+  const margin = { top: 28, right: 16, bottom: 48, left: 54 };
+  const W = Math.max(panel.offsetWidth  - margin.left - margin.right,  20);
+  const H = Math.max(panel.offsetHeight - margin.top  - margin.bottom - 38, 40);
+
+  const svg = container.append('svg')
+    .attr('width',  W + margin.left + margin.right)
+    .attr('height', H + margin.top  + margin.bottom)
+    .append('g').attr('transform', `translate(${margin.left},${margin.top})`);
+
+  const [xLo, xHi] = d3.extent(pts, d => d.x);
+  const [yLo, yHi] = d3.extent(pts, d => d.y);
+  const xPad = (xHi - xLo) * 0.06 || 1e-6;
+  const yPad = (yHi - yLo) * 0.06 || 1e-6;
+
+  const xSc = d3.scaleLinear().domain([xLo - xPad, xHi + xPad]).nice().range([0, W]);
+  const ySc = d3.scaleLinear().domain([Math.min(0, yLo - yPad), yHi + yPad]).nice().range([H, 0]);
+
+  svg.append('g').attr('transform', `translate(0,${H})`)
+    .call(d3.axisBottom(xSc).ticks(4).tickSizeOuter(0))
+    .selectAll('text').style('font-size', '9px');
+  svg.append('g').call(d3.axisLeft(ySc).ticks(5).tickSizeOuter(0))
+    .selectAll('text').style('font-size', '9px');
+
+  // Axis labels
+  svg.append('text')
+    .attr('x', W / 2).attr('y', H + 38)
+    .attr('text-anchor', 'middle').attr('font-size', 10).attr('fill', '#555')
+    .text('Predicted distance');
+  svg.append('text')
+    .attr('transform', 'rotate(-90)')
+    .attr('x', -H / 2).attr('y', -margin.left + 13)
+    .attr('text-anchor', 'middle').attr('font-size', 10).attr('fill', '#555')
+    .text('Reference distance');
+
+  // Many same-genome pairs stack at y=0 — draw inter-genome first (behind),
+  // then intra-genome (orange) on top so they're always visible.
+  const r   = n > 2000 ? 1.5 : n > 500 ? 2 : 2.5;
+  const opa = n > 2000 ? 0.25 : n > 500 ? 0.35 : 0.5;
+
+  svg.selectAll('circle.inter').data(pts.filter(d => !d.same)).join('circle')
+    .attr('class', 'inter')
+    .attr('cx', d => xSc(d.x)).attr('cy', d => ySc(d.y))
+    .attr('r', r).attr('fill', '#4e79a7').attr('fill-opacity', opa).attr('stroke', 'none');
+
+  svg.selectAll('circle.intra').data(pts.filter(d => d.same)).join('circle')
+    .attr('class', 'intra')
+    .attr('cx', d => xSc(d.x)).attr('cy', d => ySc(d.y))
+    .attr('r', r + 0.5).attr('fill', '#f28e2b').attr('fill-opacity', Math.min(1, opa * 1.6)).attr('stroke', 'none');
+
+  // Annotation: correlation + pair counts
+  const nSame  = pts.filter(d => d.same).length;
+  const nInter = n - nSame;
+  svg.append('text')
+    .attr('x', W).attr('y', -10)
+    .attr('text-anchor', 'end').attr('font-size', 9).attr('fill', '#334155')
+    .text(`r = ${d3.format('.3f')(pearsonR)}  ·  ${d3.format(',')(n)} pairs  (${d3.format(',')(nSame)} intra-genome)`);
 }

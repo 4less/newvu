@@ -81,7 +81,9 @@ export function midpointRoot(hierRoot) {
     const elen = n.data.len;
     if (acc + elen >= half) {
       splitChild    = n;
-      distFromChild = elen - (half - acc);
+      // distFromChild = distance from new root to the child (tipA-side) end of the split edge.
+      // distFromParent (computed below) = distance from new root to the parent end.
+      distFromChild = half - acc;
       break;
     }
     acc += elen;

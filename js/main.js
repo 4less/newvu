@@ -1,11 +1,12 @@
 import * as d3 from 'https://cdn.jsdelivr.net/npm/d3@7/+esm';
 import { state } from './state.js';
+import { createTreeState } from './treeState.js';
 import { parseNewick, buildHierarchy, midpointRoot } from './newick.js';
 import { loadMeta, rebuildColorScale, rebuildShapeScale } from './meta.js';
 import { draw } from './render.js';
 import { drawBoxplot } from './boxplot.js';
 import { buildShareUrl, loadFromUrl } from './share.js';
-import { exportZip } from './export.js';
+import { exportZip, exportSvg } from './export.js';
 
 /* ══════════════════════════════════════════════════════════════════════════
    DEFAULT DATA
@@ -115,7 +116,90 @@ sample_98	GCF_001406855.1	Roseburia inulinivorans	5.83405
 sample_99	GCF_003458535.1	Roseburia inulinivorans	12.5845`;
 
 /* ══════════════════════════════════════════════════════════════════════════
-   SPLIT PANEL
+   TREE INSTANCES
+══════════════════════════════════════════════════════════════════════════ */
+const tree1 = createTreeState();
+const tree2 = createTreeState();
+state.activeTree    = tree1;
+state.primaryTree   = tree1; // boxplot always reflects the left (primary) tree
+state.secondaryTree = tree2; // comparison tree for pairwise distance scatter plot
+
+/* ══════════════════════════════════════════════════════════════════════════
+   TREE-2 SELECTION SYNC
+   When tips are selected in tree 1, automatically select every tip in tree 2
+   whose name matches the colour-column value (e.g. genome accession) of a
+   selected tree-1 tip.  One-directional: tree 1 → tree 2.
+══════════════════════════════════════════════════════════════════════════ */
+function syncTree2Selection() {
+  const panel = document.getElementById('tree2-panel');
+  if (panel.classList.contains('hidden') || !tree2._leaves) return;
+
+  // Collect colour-column values (e.g. genome accessions) for each selected tree-1 tip.
+  const targets = new Set();
+  for (const name of tree1.selectedNames) {
+    const key = name.trim();
+    const row = state.currentMeta?.get(key);
+    if (row && state.currentColorCol) {
+      const v = row[state.currentColorCol];
+      if (v) targets.add(v.trim());
+    } else if (state.colorScale &&
+               typeof state.colorScale.domain()[0] === 'string' &&
+               state.colorScale.domain().includes(key)) {
+      // Tree-1 tip name is itself a colour-domain value — use it directly.
+      targets.add(key);
+    }
+  }
+
+  // Rebuild tree-2 selection: select every leaf whose name (or whose metadata
+  // colour-column value) matches one of the collected genome identifiers.
+  tree2.selectedNames.clear();
+  if (targets.size > 0) {
+    for (const leaf of tree2._leaves) {
+      const n = leaf.data.name.trim();
+      if (targets.has(n)) {
+        tree2.selectedNames.add(leaf.data.name);
+        continue;
+      }
+      // Fallback: tree-2 tips are sample IDs — look up their genome.
+      const row = state.currentMeta?.get(n);
+      if (row && state.currentColorCol) {
+        const v = row[state.currentColorCol];
+        if (v && targets.has(v.trim())) tree2.selectedNames.add(leaf.data.name);
+      }
+    }
+  }
+
+  // Update tree-2 visual state without a full redraw.
+  if (tree2._tipG) {
+    tree2._tipG.classed('selected', d => tree2.selectedNames.has(d.data.name));
+  }
+}
+
+state.onPrimarySelectionChange = syncTree2Selection;
+
+/* ── Draw helpers ─────────────────────────────────────────────────────── */
+function drawTree1() {
+  if (tree1.currentData) draw(tree1, 'tree');
+}
+function drawTree2() {
+  if (tree2.currentData && !document.getElementById('tree2-panel').classList.contains('hidden'))
+    draw(tree2, 'tree2');
+}
+function drawAll() { drawTree1(); drawTree2(); }
+
+/* ── Compare panel helpers ────────────────────────────────────────────── */
+function showTree2() {
+  document.getElementById('tree2-panel').classList.remove('hidden');
+  document.getElementById('compare-btn').textContent = '− Compare';
+  if (tree2.currentData) drawTree2();
+}
+function hideTree2() {
+  document.getElementById('tree2-panel').classList.add('hidden');
+  document.getElementById('compare-btn').textContent = '+ Compare';
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   SPLIT PANEL  (boxplot sidebar)
 ══════════════════════════════════════════════════════════════════════════ */
 const DEFAULT_PANEL_W = 300;
 let leftPanelW = 0;
@@ -134,7 +218,6 @@ document.getElementById('toggle-btn').addEventListener('click', () => {
 (function () {
   const divider = document.getElementById('divider');
   let dragging = false, startX = 0, startW = 0;
-
   divider.addEventListener('mousedown', e => {
     if (e.target.id === 'toggle-btn') return;
     dragging = true; startX = e.clientX; startW = leftPanelW;
@@ -155,100 +238,153 @@ document.getElementById('toggle-btn').addEventListener('click', () => {
 })();
 
 /* ══════════════════════════════════════════════════════════════════════════
-   FILE UPLOADS & CONTROLS
+   FILE UPLOADS
 ══════════════════════════════════════════════════════════════════════════ */
-d3.select('#nwk-upload').on('change', function() {
-  const file = this.files[0]; if (!file) return;
+function loadNewickFile(file, ts, titleId, midpointId) {
   const reader = new FileReader();
   reader.onload = e => {
-    state.originalNewick = e.target.result.trim();
-    state.originalData = parseNewick(state.originalNewick);
-    d3.select('#title').text(file.name.replace(/\.[^.]+$/, ''));
-    d3.select('#midpoint-chk').property('checked', false);
-    state.currentData   = state.originalData;
-    state.zoomTransform = null;
-    draw(state.currentData);
+    ts.originalNewick = e.target.result.trim();
+    ts.originalData   = parseNewick(ts.originalNewick);
+    ts.currentData    = ts.originalData;
+    ts.zoomTransform  = null;
+    d3.select(`#${titleId}`).text(file.name.replace(/\.[^.]+$/, ''));
+    d3.select(`#${midpointId}`).property('checked', false);
+    if (ts === tree1) drawTree1(); else drawTree2();
   };
   reader.readAsText(file);
+}
+
+d3.select('#nwk-upload').on('change', function() {
+  const f = this.files[0]; if (!f) return;
+  loadNewickFile(f, tree1, 'title', 'midpoint-chk');
+});
+d3.select('#nwk-upload2').on('change', function() {
+  const f = this.files[0]; if (!f) return;
+  loadNewickFile(f, tree2, 'title2', 'midpoint-chk2');
 });
 
 d3.select('#meta-upload').on('change', function() {
-  const file = this.files[0]; if (!file) return;
+  const f = this.files[0]; if (!f) return;
   const reader = new FileReader();
   reader.onload = e => {
-    state.rawMeta = e.target.result;
+    state.rawMeta        = e.target.result;
     state.currentColorCol = null;
     state.currentLabelCol = null;
-    state.colorScale = null;
+    state.colorScale      = null;
+    state.shapeCol        = null;
+    state.shapeScale      = null;
     loadMeta(state.rawMeta);
-    draw(state.currentData);
+    drawAll();
   };
-  reader.readAsText(file);
+  reader.readAsText(f);
 });
 
+/* ══════════════════════════════════════════════════════════════════════════
+   SHARED CONTROLS (colour, shape, label)
+══════════════════════════════════════════════════════════════════════════ */
 d3.select('#color-select').on('change', function() {
   state.currentColorCol = this.value || null;
   rebuildColorScale();
-  draw(state.currentData);
+  drawAll();
 });
-
 d3.select('#shape-select').on('change', function() {
   state.shapeCol = this.value || null;
   rebuildShapeScale();
-  draw(state.currentData);
+  drawAll();
 });
-
 d3.select('#label-select').on('change', function() {
   state.currentLabelCol = this.value || null;
-  draw(state.currentData);
+  drawAll();
 });
 
-d3.select('#width-plus') .on('click', () => { state.treeWidthDelta += 80; draw(state.currentData); });
-d3.select('#width-minus').on('click', () => { state.treeWidthDelta -= 80; draw(state.currentData); });
-d3.select('#width-reset').on('click', () => { state.treeWidthDelta = 0;  draw(state.currentData); });
+/* ══════════════════════════════════════════════════════════════════════════
+   PER-TREE CONTROLS
+══════════════════════════════════════════════════════════════════════════ */
+function bindTreeControls(ts, ids, drawFn) {
+  const { midpoint, circular } = ids;
+  d3.select(`#${midpoint}`).on('change', function() {
+    ts.currentData   = this.checked ? midpointRoot(buildHierarchy(ts.originalData)) : ts.originalData;
+    ts.zoomTransform = null;
+    drawFn();
+  });
+  d3.select(`#${circular}`).on('change', function() {
+    ts.circularLayout = this.checked;
+    ts.zoomTransform  = null;
+    drawFn();
+  });
+}
 
+bindTreeControls(tree1, { midpoint: 'midpoint-chk',  circular: 'circular-chk'  }, drawTree1);
+bindTreeControls(tree2, { midpoint: 'midpoint-chk2', circular: 'circular-chk2' }, drawTree2);
+
+/* ══════════════════════════════════════════════════════════════════════════
+   COMPARE BUTTON
+══════════════════════════════════════════════════════════════════════════ */
+document.getElementById('compare-btn').addEventListener('click', () => {
+  document.getElementById('tree2-panel').classList.contains('hidden')
+    ? showTree2() : hideTree2();
+});
+document.getElementById('close-compare-btn').addEventListener('click', hideTree2);
+
+/* ══════════════════════════════════════════════════════════════════════════
+   BOXPLOT
+══════════════════════════════════════════════════════════════════════════ */
 d3.select('#boxplot-select').on('change', function() {
   state.boxplotCol = this.value || null;
   drawBoxplot();
 });
 
-d3.select('#midpoint-chk').on('change', function() {
-  state.currentData   = this.checked ? midpointRoot(buildHierarchy(state.originalData)) : state.originalData;
-  state.zoomTransform = null;
-  draw(state.currentData);
-});
-
-d3.select('#circular-chk').on('change', function() {
-  state.circularLayout  = this.checked;
-  state.zoomTransform   = null;           // coordinate system changes
-  draw(state.currentData);
-});
-
-/* ── Toolbox ─────────────────────────────────────────────────────────────── */
+/* ══════════════════════════════════════════════════════════════════════════
+   TOOLBOX
+══════════════════════════════════════════════════════════════════════════ */
 ['pan', 'select', 'zoomrect'].forEach(tool => {
   document.getElementById(`tool-${tool}`).addEventListener('click', () => {
     state.activeTool = tool;
     document.querySelectorAll('.tool-btn').forEach(b => b.classList.remove('active'));
     document.getElementById(`tool-${tool}`).classList.add('active');
-    draw(state.currentData);  // redraw preserves zoomTransform
+    drawAll();
   });
 });
 
-// Ctrl held → show grab cursor so the pan mode change is obvious
-document.addEventListener('keydown', e => {
-  if (e.key === 'Control' && state.activeTool !== 'pan')
-    d3.select('#tree svg').classed('panning', true);
+/* ══════════════════════════════════════════════════════════════════════════
+   FONT & TIP SIZE
+══════════════════════════════════════════════════════════════════════════ */
+(function () {
+  const valEl = document.getElementById('font-size-val');
+
+  function setFontSize(px) {
+    state.tipFontSize = Math.min(24, Math.max(4, px));
+    valEl.textContent = state.tipFontSize;
+    drawAll();
+  }
+
+  function setTipSize(delta) {
+    state.tipSize = Math.min(256, Math.max(6, state.tipSize + delta));
+    drawAll();
+  }
+
+  document.getElementById('font-minus').addEventListener('click', () => setFontSize(state.tipFontSize - 1));
+  document.getElementById('font-plus') .addEventListener('click', () => setFontSize(state.tipFontSize + 1));
+  document.getElementById('tip-minus') .addEventListener('click', () => setTipSize(-16));
+  document.getElementById('tip-plus')  .addEventListener('click', () => setTipSize(+16));
+})();
+
+/* ══════════════════════════════════════════════════════════════════════════
+   EXPORT & SHARE
+══════════════════════════════════════════════════════════════════════════ */
+document.getElementById('export-btn').addEventListener('click', () => exportZip(tree1, tree2));
+
+document.getElementById('svg-export1').addEventListener('click', () => {
+  const name = (document.getElementById('title')?.textContent?.trim() || 'tree1').replace(/\s+/g, '_');
+  exportSvg('tree', `${name}.svg`);
 });
-document.addEventListener('keyup', e => {
-  if (e.key === 'Control') d3.select('#tree svg').classed('panning', false);
+document.getElementById('svg-export2').addEventListener('click', () => {
+  const name = (document.getElementById('title2')?.textContent?.trim() || 'tree2').replace(/\s+/g, '_');
+  exportSvg('tree2', `${name}.svg`);
 });
 
-/* ── Export button ───────────────────────────────────────────────────────── */
-document.getElementById('export-btn').addEventListener('click', () => exportZip());
-
-/* ── Share button ────────────────────────────────────────────────────────── */
 document.getElementById('share-btn').addEventListener('click', async () => {
-  const url = buildShareUrl();
+  const url = buildShareUrl(tree1, tree2);
   await navigator.clipboard.writeText(url);
   const btn = document.getElementById('share-btn');
   const prev = btn.textContent;
@@ -257,12 +393,25 @@ document.getElementById('share-btn').addEventListener('click', async () => {
   setTimeout(() => { btn.textContent = prev; btn.disabled = false; }, 1800);
 });
 
-/* ── Initial render ──────────────────────────────────────────────────────── */
+/* ══════════════════════════════════════════════════════════════════════════
+   CTRL KEY CURSOR
+══════════════════════════════════════════════════════════════════════════ */
+document.addEventListener('keydown', e => {
+  if (e.key === 'Control' && state.activeTool !== 'pan')
+    d3.selectAll('.tree-canvas svg').classed('panning', true);
+});
+document.addEventListener('keyup', e => {
+  if (e.key === 'Control') d3.selectAll('.tree-canvas svg').classed('panning', false);
+});
+
+/* ══════════════════════════════════════════════════════════════════════════
+   INITIAL RENDER
+══════════════════════════════════════════════════════════════════════════ */
 const shared = loadFromUrl();
 if (shared) {
-  state.originalNewick = shared.nwk;
-  state.originalData   = parseNewick(shared.nwk);
-  state.currentData    = state.originalData;
+  tree1.originalNewick = shared.nwk;
+  tree1.originalData   = parseNewick(shared.nwk);
+  tree1.currentData    = tree1.originalData;
   if (shared.title) d3.select('#title').text(shared.title);
   if (shared.meta) {
     state.rawMeta = shared.meta;
@@ -272,18 +421,31 @@ if (shared) {
       d3.select('#label-select').property('value', shared.label);
     }
   }
+  if (shared.nwk2) {
+    tree2.originalNewick = shared.nwk2;
+    tree2.originalData   = parseNewick(shared.nwk2);
+    tree2.currentData    = tree2.originalData;
+    if (shared.title2) d3.select('#title2').text(shared.title2);
+    showTree2();
+  }
 } else {
-  state.originalNewick = DEFAULT_NEWICK;
-  state.originalData   = parseNewick(DEFAULT_NEWICK);
-  state.currentData    = state.originalData;
+  tree1.originalNewick = DEFAULT_NEWICK;
+  tree1.originalData   = parseNewick(DEFAULT_NEWICK);
+  tree1.currentData    = tree1.originalData;
   state.rawMeta        = DEFAULT_META_TSV;
   loadMeta(DEFAULT_META_TSV, 'genome');
 }
-draw(state.currentData);
 
-let _rafPending = false;
+drawTree1();
+
+/* ── Resize observers ─────────────────────────────────────────────────── */
+let _raf1 = false, _raf2 = false;
 new ResizeObserver(() => {
-  if (_rafPending) return;
-  _rafPending = true;
-  requestAnimationFrame(() => { _rafPending = false; draw(state.currentData); });
+  if (_raf1) return; _raf1 = true;
+  requestAnimationFrame(() => { _raf1 = false; drawTree1(); });
 }).observe(document.getElementById('tree'));
+
+new ResizeObserver(() => {
+  if (_raf2) return; _raf2 = true;
+  requestAnimationFrame(() => { _raf2 = false; drawTree2(); });
+}).observe(document.getElementById('tree2'));

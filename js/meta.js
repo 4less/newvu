@@ -50,6 +50,7 @@ export function loadMeta(tsvText, defaultColorCol = null) {
   bpSel.selectAll('option').remove();
   bpSel.append('option').attr('value', '').text('— choose —');
   bpSel.append('option').attr('value', '__pairwise__').text('Pairwise distances');
+  bpSel.append('option').attr('value', '__pairwise_comparison__').text('Distance comparison (scatter)');
   numCols.forEach(c => bpSel.append('option').attr('value', c).text(c));
   if (!state.boxplotCol) {
     state.boxplotCol = '__pairwise__';

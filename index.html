@@ -14,19 +14,10 @@
 <!-- ── Brand bar ────────────────────────────────────────────── -->
 <div id="brandbar">
   <span class="brand-name">newvu</span>
-  <div class="brand-divider"></div>
-  <span id="title">Roseburia inulinivorans — predicted tree</span>
 </div>
 
-<!-- ── Toolbar ─────────────────────────────────────────────── -->
+<!-- ── Shared toolbar ──────────────────────────────────────── -->
 <div id="toolbar">
-  <div class="tb-group">
-    <span class="tb-cap">Tree</span>
-    <input type="file" id="nwk-upload" accept=".nwk,.newick,.tree,.txt">
-  </div>
-
-  <div class="tb-sep"></div>
-
   <div class="tb-group">
     <span class="tb-cap">Metadata</span>
     <input type="file" id="meta-upload" accept=".tsv,.csv,.txt">
@@ -46,6 +37,8 @@
     <select id="shape-select"><option value="">— none —</option></select>
   </div>
 
+  <div class="tb-sep"></div>
+
   <div class="tb-group">
     <span class="tb-cap">Label</span>
     <select id="label-select"><option value="">— tip name —</option></select>
@@ -53,26 +46,28 @@
 
   <div class="tb-sep"></div>
 
-  <label class="check-label">
-    <input type="checkbox" id="midpoint-chk"> Midpoint root
-  </label>
-
-  <label class="check-label">
-    <input type="checkbox" id="circular-chk"> Circular
-  </label>
-
-  <div class="tb-sep"></div>
-
   <div class="tb-group">
-    <span class="tb-cap">Width</span>
-    <button class="btn-icon" id="width-reset" title="Reset width">↺</button>
-    <button class="btn-icon" id="width-minus" title="Narrower">−</button>
-    <button class="btn-icon" id="width-plus"  title="Wider">+</button>
+    <span class="tb-cap">Font</span>
+    <button class="btn-icon" id="font-minus" title="Smaller labels">−</button>
+    <span id="font-size-val" class="tb-val">11</span>
+    <button class="btn-icon" id="font-plus"  title="Larger labels">+</button>
   </div>
 
   <div class="tb-sep"></div>
 
-  <button id="export-btn" title="Download tree and metadata as ZIP">Export ↓</button>
+  <div class="tb-group">
+    <span class="tb-cap">Tips</span>
+    <button class="btn-icon" id="tip-minus" title="Smaller tips">−</button>
+    <button class="btn-icon" id="tip-plus"  title="Larger tips">+</button>
+  </div>
+
+  <div class="tb-sep"></div>
+
+  <button id="compare-btn">+ Compare</button>
+
+  <div class="tb-sep"></div>
+
+  <button id="export-btn" title="Download tree(s) and metadata as ZIP">Export ↓</button>
   <button id="share-btn"  title="Copy share link to clipboard">Share ⎘</button>
 </div>
 
@@ -89,29 +84,21 @@
 <!-- ── Main workspace ──────────────────────────────────────── -->
 <div id="main-content">
 
-  <!-- ── Toolbox ───────────────────────────────────────────── -->
+  <!-- ── Toolbox ─────────────────────────────────────────── -->
   <div id="toolbox">
-
     <!-- Pan -->
     <button class="tool-btn" id="tool-pan" title="Pan — drag to move">
-      <!-- default: open hand, all 5 fingers -->
       <span class="icon-default">
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M5 10V12"/>
-          <path d="M8.5 7V12"/>
-          <path d="M12 5V12"/>
-          <path d="M15.5 7V12"/>
-          <path d="M19 10V12"/>
+          <path d="M5 10V12"/><path d="M8.5 7V12"/><path d="M12 5V12"/>
+          <path d="M15.5 7V12"/><path d="M19 10V12"/>
           <path d="M3.5 12 Q11.5 21 20.5 12"/>
         </svg>
       </span>
-      <!-- active: grabbing fist -->
       <span class="icon-active">
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M5.5 10a1.5 1.5 0 0 1 3 0"/>
-          <path d="M9 10a1.5 1.5 0 0 1 3 0"/>
-          <path d="M12.5 10a1.5 1.5 0 0 1 3 0"/>
-          <path d="M16 10a1.5 1.5 0 0 1 2.5 0"/>
+          <path d="M5.5 10a1.5 1.5 0 0 1 3 0"/><path d="M9 10a1.5 1.5 0 0 1 3 0"/>
+          <path d="M12.5 10a1.5 1.5 0 0 1 3 0"/><path d="M16 10a1.5 1.5 0 0 1 2.5 0"/>
           <path d="M4.5 10h14v2A7 7 0 0 1 4.5 12v-2z"/>
           <path d="M4.5 12a3 3 0 0 0-3 1.2l2 1.5"/>
         </svg>
@@ -120,14 +107,12 @@
 
     <!-- Select -->
     <button class="tool-btn active" id="tool-select" title="Select — drag to select tips">
-      <!-- default: dashed marquee + centre dot -->
       <span class="icon-default">
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round">
           <rect x="3" y="3" width="18" height="18" rx="2" stroke-dasharray="4 3"/>
           <circle cx="12" cy="12" r="1.5" fill="currentColor" stroke="none"/>
         </svg>
       </span>
-      <!-- active: dashed marquee + corner handles -->
       <span class="icon-active">
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round">
           <rect x="3" y="3" width="18" height="18" rx="1" stroke-dasharray="4 3"/>
@@ -141,30 +126,63 @@
 
     <!-- Zoom to region -->
     <button class="tool-btn" id="tool-zoomrect" title="Zoom to region — drag to zoom in · double-click to reset">
-      <!-- default: magnifier + plus -->
       <span class="icon-default">
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round">
           <circle cx="10" cy="10" r="6.5"/>
-          <path d="M19 19l-3.5-3.5"/>
-          <path d="M10 7v6M7 10h6"/>
+          <path d="M19 19l-3.5-3.5"/><path d="M10 7v6M7 10h6"/>
         </svg>
       </span>
-      <!-- active: magnifier + minus (double-click resets) -->
       <span class="icon-active">
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round">
           <circle cx="10" cy="10" r="6.5"/>
-          <path d="M19 19l-3.5-3.5"/>
-          <path d="M7 10h6"/>
+          <path d="M19 19l-3.5-3.5"/><path d="M7 10h6"/>
         </svg>
       </span>
     </button>
-
   </div>
 
-  <div id="right-panel">
-    <div id="tree"></div>
-    <div id="legend"></div>
-  </div>
+  <!-- ── Trees wrapper (holds 1 or 2 panels side by side) ─── -->
+  <div id="trees-wrapper">
+
+    <!-- Tree 1 -->
+    <div id="tree1-panel" class="tree-panel">
+      <div class="tree-subbar">
+        <div class="subbar-row subbar-title-row">
+          <span class="tree-title" id="title">Roseburia inulinivorans — predicted tree</span>
+          <input type="file" id="nwk-upload" accept=".nwk,.newick,.tree,.treefile,.txt" title="Load Newick tree">
+        </div>
+        <div class="subbar-row subbar-ctrl-row">
+          <label class="check-label"><input type="checkbox" id="midpoint-chk"> Midpoint</label>
+          <label class="check-label"><input type="checkbox" id="circular-chk"> Circular</label>
+          <div class="tb-sep"></div>
+          <button class="btn-svg-export" id="svg-export1" title="Export as SVG">SVG ↓</button>
+        </div>
+      </div>
+      <div id="tree" class="tree-canvas"></div>
+      <div id="legend"></div>
+    </div>
+
+    <!-- Tree 2 (hidden until Compare is clicked) -->
+    <div id="tree2-panel" class="tree-panel hidden">
+      <div class="tree-subbar">
+        <div class="subbar-row subbar-title-row">
+          <span class="tree-title" id="title2">— load a tree to compare —</span>
+          <input type="file" id="nwk-upload2" accept=".nwk,.newick,.tree,.treefile,.txt" title="Load Newick tree">
+          <button class="btn-icon subbar-close" id="close-compare-btn" title="Close comparison">✕</button>
+        </div>
+        <div class="subbar-row subbar-ctrl-row">
+          <label class="check-label"><input type="checkbox" id="midpoint-chk2"> Midpoint</label>
+          <label class="check-label"><input type="checkbox" id="circular-chk2"> Circular</label>
+          <div class="tb-sep"></div>
+          <button class="btn-svg-export" id="svg-export2" title="Export as SVG">SVG ↓</button>
+        </div>
+      </div>
+      <div id="tree2" class="tree-canvas"></div>
+    </div>
+
+  </div><!-- end #trees-wrapper -->
+
+  <!-- ── Boxplot divider + sidebar ───────────────────────── -->
   <div id="divider"><button id="toggle-btn">◀</button></div>
   <div id="left-panel">
     <div id="left-header">
@@ -172,7 +190,8 @@
     </div>
     <div id="boxplot"></div>
   </div>
-</div>
+
+</div><!-- end #main-content -->
 
 <script type="module" src="js/main.js"></script>
 </body>

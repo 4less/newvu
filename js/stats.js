@@ -3,11 +3,13 @@ import { state } from './state.js';
 import { drawBoxplot } from './boxplot.js';
 
 /* ══════════════════════════════════════════════════════════════════════════
-   SELECTION STATS
+   SELECTION STATS  (operates on a specific treeState instance)
 ══════════════════════════════════════════════════════════════════════════ */
-export function updateStats() {
+export function updateStats(treeState) {
+  state.activeTree = treeState;   // track which tree drove the last interaction
+
   const info  = d3.select('#info');
-  const nodes = (state._leaves || []).filter(l => state.selectedNames.has(l.data.name));
+  const nodes = (treeState._leaves || []).filter(l => treeState.selectedNames.has(l.data.name));
 
   if (nodes.length === 0) {
     info.html('No tips selected &nbsp;·&nbsp; click a tip, click an edge, or drag a rectangle to select.');
@@ -20,7 +22,6 @@ export function updateStats() {
     return;
   }
 
-  // All pairwise tree distances using native node.ancestors() to find LCA
   const dists = [];
   for (let i = 0; i < nodes.length; i++) {
     const aAncs = new Set(nodes[i].ancestors());
@@ -39,10 +40,15 @@ export function updateStats() {
     `mean <strong>${fmt(d3.mean(dists))}</strong>`
   );
   drawBoxplot();
+
+  // Sync tree 2 selection whenever tree 1's selection changes (one-way).
+  if (treeState === state.primaryTree && typeof state.onPrimarySelectionChange === 'function') {
+    state.onPrimarySelectionChange();
+  }
 }
 
-export function clearSelection() {
-  state.selectedNames.clear();
-  if (state._tipG) state._tipG.classed('selected', false);
-  updateStats();
+export function clearSelection(treeState) {
+  treeState.selectedNames.clear();
+  if (treeState._tipG) treeState._tipG.classed('selected', false);
+  updateStats(treeState);
 }

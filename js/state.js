@@ -1,26 +1,38 @@
 /**
- * Shared mutable application state.
- * All modules import this object and mutate its properties directly.
+ * Shared application state — metadata, colour/shape/label scales, active tool.
+ * Per-tree state (data, zoom, selection …) lives in treeState.js instances.
  */
 export const state = {
-  originalData:    null,   // parsed Newick tree (never re-rooted)
-  currentData:     null,   // tree currently displayed (may be midpoint-rooted)
-  currentMeta:     null,   // Map<tipName, rowObject> from loaded TSV/CSV
-  metaCols:        [],     // metadata column names (excluding the key column)
-  currentColorCol: null,   // which column drives node/branch colour
-  currentLabelCol: null,   // which column replaces tip labels
-  colorScale:      null,   // d3 colour scale (ordinal or sequential)
-  isLogScale:      false,  // whether the sequential scale uses log spacing
-  shapeCol:        null,   // which column drives tip shape
-  shapeScale:      null,   // d3 ordinal scale: value → d3 symbol type
-  boxplotCol:      null,   // column (or '__pairwise__') shown in the sidebar
-  treeWidthDelta:  0,      // cumulative px adjustment from +/- width buttons
-  selectedNames:   new Set(), // Set<string> of currently selected tip names
-  _tipG:           null,   // live d3 selection of tip <g> elements (set by draw)
-  _leaves:         null,   // live array of hierarchy leaf nodes (set by draw)
-  originalNewick:  null,   // raw Newick string (for share link)
-  rawMeta:         null,   // raw TSV/CSV string (for share link)
-  circularLayout:  false,  // true → radial/circular tree layout
+  /* ── Metadata (shared across all trees) ───── */
+  currentMeta:     null,   // Map<tipName, rowObject>
+  metaCols:        [],     // column names (excluding key column)
+  currentColorCol: null,
+  colorScale:      null,   // d3 ordinal or sequential scale
+  isLogScale:      false,
+  shapeCol:        null,
+  shapeScale:      null,
+  currentLabelCol: null,
+  rawMeta:         null,   // raw TSV/CSV string (for share / export)
+
+  /* ── Boxplot sidebar ─────────────────────── */
+  boxplotCol:      null,   // column or '__pairwise__'
+
+  /* ── Tool ────────────────────────────────── */
   activeTool:      'select', // 'pan' | 'select' | 'zoomrect'
-  zoomTransform:   null,   // preserved d3.ZoomTransform across redraws
+
+  /* ── Active tree (drives stats bar) ─────── */
+  activeTree:      null,   // reference to the currently focused treeState
+
+  /* ── Primary tree (always drives boxplot) ─ */
+  primaryTree:     null,   // always tree1 — set in main.js
+
+  /* ── Secondary tree (for comparison plots) ─ */
+  secondaryTree:   null,   // always tree2 — set in main.js
+
+  /* ── Selection-sync hook ─────────────────── */
+  onPrimarySelectionChange: null, // () => void, set in main.js
+
+  /* ── Display sizing (shared across trees) ── */
+  tipFontSize: 11,   // px — tip label font size
+  tipSize:     64,   // d3 symbol area for tip markers
 };
