@@ -155,8 +155,14 @@
           <label class="check-label"><input type="checkbox" id="midpoint-chk"> Midpoint</label>
           <label class="check-label"><input type="checkbox" id="circular-chk"> Circular</label>
           <div class="tb-sep"></div>
+          <button class="filter-toggle-btn" id="filter-toggle-btn" title="Show/hide filters">⊘ Filter</button>
+          <div class="tb-sep"></div>
           <button class="btn-svg-export" id="svg-export1" title="Export as SVG">SVG ↓</button>
         </div>
+      </div>
+      <!-- Filter panel — collapsible, sits between subbar and tree canvas -->
+      <div id="filter-panel" class="filter-panel">
+        <div class="fp-inner" id="filter-inner"></div>
       </div>
       <div id="tree" class="tree-canvas"></div>
       <div id="legend"></div>

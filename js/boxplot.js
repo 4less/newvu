@@ -18,16 +18,26 @@ export function drawBoxplot() {
     return;
   }
 
-  // Pairwise comparison uses ALL tips — no selection required.
+  // Pairwise comparison uses ALL (filtered) tips — no selection required.
   if (state.boxplotCol === '__pairwise_comparison__') {
     drawPairwiseScatter(container, treeState, panel);
     return;
   }
 
-  if (!treeState || treeState.selectedNames.size === 0) {
+  // Effective leaf set: if filter active use passing tips, else use selection.
+  const fln = treeState.filteredLeafNames;
+  const hasFilter = fln !== null;
+  const hasSelection = treeState.selectedNames.size > 0;
+
+  if (!hasFilter && !hasSelection) {
     container.append('div').attr('class', 'bp-placeholder').text('Select tips in the tree to see the distribution.');
     return;
   }
+
+  // When filter is active, show all passing tips; otherwise show selected.
+  const effectiveLeaves = hasFilter
+    ? (treeState._leaves || []).filter(l => fln.has(l.data.name))
+    : (treeState._leaves || []).filter(l => treeState.selectedNames.has(l.data.name));
 
   const isCat = state.colorScale && typeof state.colorScale.domain()[0] === 'string' && state.currentColorCol;
   let pts = [];
@@ -35,7 +45,7 @@ export function drawBoxplot() {
 
   if (state.boxplotCol === '__pairwise__') {
     yLabel = 'Cophenetic distance';
-    const selLeaves = (treeState._leaves || []).filter(l => treeState.selectedNames.has(l.data.name));
+    const selLeaves = effectiveLeaves;
     if (selLeaves.length < 2) {
       container.append('div').attr('class', 'bp-placeholder').text('Select at least 2 tips to compute pairwise distances.');
       return;
@@ -60,8 +70,9 @@ export function drawBoxplot() {
       container.append('div').attr('class', 'bp-placeholder').text('Load metadata to plot this variable.');
       return;
     }
-    pts = [...treeState.selectedNames].flatMap(name => {
-      const row = state.currentMeta.get(name);
+    pts = effectiveLeaves.flatMap(leaf => {
+      const name = leaf.data.name;
+      const row  = state.currentMeta.get(name);
       if (!row) return [];
       const val = +row[state.boxplotCol];
       if (isNaN(val)) return [];

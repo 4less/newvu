@@ -11,7 +11,8 @@ export function createTreeState() {
     zoomTransform:   null,   // preserved d3.ZoomTransform across redraws
     circularLayout:  false,
     treeWidthDelta:  0,      // cumulative px from +/- width buttons
-    selectedNames:   new Set(),
+    selectedNames:      new Set(),
+    filteredLeafNames:  null,  // Set<name> of tips that pass current filters; null = no filter
     _tipG:           null,   // live d3 selection of tip <g> elements
     _leaves:         null,   // live array of hierarchy leaf nodes
   };

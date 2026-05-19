@@ -139,6 +139,19 @@ export function draw(treeState, containerId = 'tree') {
   const effectiveFontSize = Math.max(4, Math.round(state.tipFontSize * _scale));
   const effectiveTipSize  = Math.max(6, Math.round(state.tipSize  * _scale));
 
+  /* ── Filter: bottom-up pass to mark nodes with ≥1 passing leaf ─────── */
+  const fln = treeState.filteredLeafNames; // Set<name> | null
+  if (fln) {
+    // eachAfter visits children before parents, so parent can derive from children.
+    root.eachAfter(node => {
+      if (!node.children) {
+        node._anyPass = fln.has(node.data.name);
+      } else {
+        node._anyPass = node.children.some(c => c._anyPass);
+      }
+    });
+  }
+
   /* ── Node positions ───────────────────────────────────────────────────── */
   root.each(node => {
     if (circular) {
@@ -310,12 +323,16 @@ export function draw(treeState, containerId = 'tree') {
   brushG.call(brush);
 
   /* ── Links ────────────────────────────────────────────────────────────── */
+  // Only render branches for nodes that have at least one passing leaf.
+  const branchNodes  = root.descendants().slice(1);
+  const visibleBranches = fln ? branchNodes.filter(d => d._anyPass) : branchNodes;
+
   svg.selectAll('.link')
-    .data(root.descendants().slice(1))
+    .data(visibleBranches)
     .join('path').attr('class', 'link').attr('d', linkPath);
 
   svg.selectAll('.link-hit')
-    .data(root.descendants().slice(1))
+    .data(visibleBranches)
     .join('path')
       .attr('class', 'link-hit').attr('d', linkPath)
       .on('click', function(event, d) {
@@ -327,15 +344,17 @@ export function draw(treeState, containerId = 'tree') {
 
   /* ── Internal node dots ───────────────────────────────────────────────── */
   svg.selectAll('.inode')
-    .data(root.descendants().filter(d => d.children))
+    .data(root.descendants().filter(d => d.children && (!fln || d._anyPass)))
     .join('circle')
       .attr('class', 'inode')
       .attr('cx', d => d.px).attr('cy', d => d.py)
       .attr('r', 1.5).attr('fill', '#cbd5e1');
 
-  /* ── Tips ─────────────────────────────────────────────────────────────── */
+  /* ── Tips — only render leaves that pass the filter ─────────────────── */
+  const visibleLeaves = fln ? leaves.filter(l => fln.has(l.data.name)) : leaves;
+
   const tipG = svg.selectAll('.tip')
-    .data(leaves)
+    .data(visibleLeaves)
     .join('g')
       .attr('class', 'tip')
       .attr('transform', d => `translate(${d.px},${d.py})`);

@@ -7,6 +7,7 @@ import { draw } from './render.js';
 import { drawBoxplot } from './boxplot.js';
 import { buildShareUrl, loadFromUrl } from './share.js';
 import { exportZip, exportSvg } from './export.js';
+import { initFilterPanel, refreshFilterOptions, computePassingNames, setFilterOnChange } from './filter.js';
 
 /* ══════════════════════════════════════════════════════════════════════════
    DEFAULT DATA
@@ -177,6 +178,44 @@ function syncTree2Selection() {
 
 state.onPrimarySelectionChange = syncTree2Selection;
 
+/* ══════════════════════════════════════════════════════════════════════════
+   FILTER APPLICATION
+   Computes passing names for tree1, syncs tree2 to matching genomes, redraws.
+══════════════════════════════════════════════════════════════════════════ */
+function applyFilters(andRedraw = true) {
+  const passing = computePassingNames(tree1);
+  tree1.filteredLeafNames = passing;
+
+  // Tree2: retain only genomes represented by at least one passing tree1 tip.
+  if (passing !== null && tree2._leaves && tree2._leaves.length > 0) {
+    const genomes = new Set();
+    for (const name of passing) {
+      const genome = state.currentMeta?.get(name.trim())?.[state.currentColorCol]?.trim();
+      if (genome) genomes.add(genome);
+    }
+    if (genomes.size > 0) {
+      tree2.filteredLeafNames = new Set(
+        tree2._leaves.map(l => l.data.name).filter(n => {
+          const t = n.trim();
+          if (genomes.has(t)) return true;
+          // also try stripping trailing version suffix (e.g. .1)
+          const noV = t.replace(/\.\d+$/, '');
+          return [...genomes].some(g => g.replace(/\.\d+$/, '') === noV);
+        })
+      );
+      if (tree2.filteredLeafNames.size === 0) tree2.filteredLeafNames = null;
+    } else {
+      tree2.filteredLeafNames = null;
+    }
+  } else {
+    tree2.filteredLeafNames = null;
+  }
+
+  if (andRedraw) { drawAll(); drawBoxplot(); }
+}
+
+setFilterOnChange(applyFilters);
+
 /* ── Draw helpers ─────────────────────────────────────────────────────── */
 function drawTree1() {
   if (tree1.currentData) draw(tree1, 'tree');
@@ -274,6 +313,7 @@ d3.select('#meta-upload').on('change', function() {
     state.shapeCol        = null;
     state.shapeScale      = null;
     loadMeta(state.rawMeta);
+    refreshFilterOptions();
     drawAll();
   };
   reader.readAsText(f);
@@ -437,6 +477,8 @@ if (shared) {
 }
 
 drawTree1();
+initFilterPanel();
+refreshFilterOptions();
 
 /* ── Resize observers ─────────────────────────────────────────────────── */
 let _raf1 = false, _raf2 = false;
