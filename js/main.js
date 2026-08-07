@@ -4,7 +4,7 @@ import { createTreeState } from './treeState.js';
 import { parseNewick, buildHierarchy, midpointRoot } from './newick.js';
 import { loadMeta, rebuildColorScale, rebuildShapeScale } from './meta.js';
 import { draw } from './render.js';
-import { drawBoxplot } from './boxplot.js';
+import { drawPlotPanel } from './plotPanel.js';
 import { buildShareUrl, loadFromUrl } from './share.js';
 import { exportZip, exportSvg } from './export.js';
 import { initFilterPanel, refreshFilterOptions, computePassingNames, setFilterOnChange } from './filter.js';
@@ -122,7 +122,7 @@ sample_99	GCF_003458535.1	Roseburia inulinivorans	12.5845`;
 const tree1 = createTreeState();
 const tree2 = createTreeState();
 state.activeTree    = tree1;
-state.primaryTree   = tree1; // boxplot always reflects the left (primary) tree
+state.primaryTree   = tree1; // the plot panel always reflects the left (primary) tree
 state.secondaryTree = tree2; // comparison tree for pairwise distance scatter plot
 
 /* ══════════════════════════════════════════════════════════════════════════
@@ -211,7 +211,7 @@ function applyFilters(andRedraw = true) {
     tree2.filteredLeafNames = null;
   }
 
-  if (andRedraw) { drawAll(); drawBoxplot(); }
+  if (andRedraw) { drawAll(); drawPlotPanel(); }
 }
 
 setFilterOnChange(applyFilters);
@@ -238,7 +238,7 @@ function hideTree2() {
 }
 
 /* ══════════════════════════════════════════════════════════════════════════
-   SPLIT PANEL  (boxplot sidebar)
+   SPLIT PANEL  (plot sidebar)
 ══════════════════════════════════════════════════════════════════════════ */
 const DEFAULT_PANEL_W = 300;
 let leftPanelW = 0;
@@ -247,7 +247,7 @@ function setLeftPanelWidth(w) {
   leftPanelW = Math.max(0, w);
   document.getElementById('left-panel').style.width = leftPanelW + 'px';
   document.getElementById('toggle-btn').textContent = leftPanelW > 10 ? '▶' : '◀';
-  drawBoxplot();
+  drawPlotPanel();
 }
 
 document.getElementById('toggle-btn').addEventListener('click', () => {
@@ -367,11 +367,11 @@ document.getElementById('compare-btn').addEventListener('click', () => {
 document.getElementById('close-compare-btn').addEventListener('click', hideTree2);
 
 /* ══════════════════════════════════════════════════════════════════════════
-   BOXPLOT
+   PLOT PANEL
 ══════════════════════════════════════════════════════════════════════════ */
-d3.select('#boxplot-select').on('change', function() {
-  state.boxplotCol = this.value || null;
-  drawBoxplot();
+d3.select('#plot-select').on('change', function() {
+  state.plotCol = this.value || null;
+  drawPlotPanel();
 });
 
 /* ══════════════════════════════════════════════════════════════════════════

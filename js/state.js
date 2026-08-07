@@ -14,8 +14,8 @@ export const state = {
   currentLabelCol: null,
   rawMeta:         null,   // raw TSV/CSV string (for share / export)
 
-  /* ── Boxplot sidebar ─────────────────────── */
-  boxplotCol:      null,   // column or '__pairwise__'
+  /* ── Plot sidebar ────────────────────────── */
+  plotCol:         null,   // metadata column, '__pairwise__' or '__pairwise_comparison__'
 
   /* ── Tool ────────────────────────────────── */
   activeTool:      'select', // 'pan' | 'select' | 'zoomrect'
@@ -23,7 +23,7 @@ export const state = {
   /* ── Active tree (drives stats bar) ─────── */
   activeTree:      null,   // reference to the currently focused treeState
 
-  /* ── Primary tree (always drives boxplot) ─ */
+  /* ── Primary tree (always drives the plot) ─ */
   primaryTree:     null,   // always tree1 — set in main.js
 
   /* ── Secondary tree (for comparison plots) ─ */

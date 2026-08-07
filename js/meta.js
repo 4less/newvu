@@ -46,15 +46,15 @@ export function loadMeta(tsvText, defaultColorCol = null) {
   populateSel('#shape-select', '— none —',    catCols);
   populateSel('#label-select', '— tip name —', state.metaCols);
 
-  const bpSel = d3.select('#boxplot-select');
-  bpSel.selectAll('option').remove();
-  bpSel.append('option').attr('value', '').text('— choose —');
-  bpSel.append('option').attr('value', '__pairwise__').text('Pairwise distances');
-  bpSel.append('option').attr('value', '__pairwise_comparison__').text('Distance comparison (scatter)');
-  numCols.forEach(c => bpSel.append('option').attr('value', c).text(c));
-  if (!state.boxplotCol) {
-    state.boxplotCol = '__pairwise__';
-    bpSel.property('value', '__pairwise__');
+  const plotSel = d3.select('#plot-select');
+  plotSel.selectAll('option').remove();
+  plotSel.append('option').attr('value', '').text('— choose —');
+  plotSel.append('option').attr('value', '__pairwise__').text('Pairwise distances');
+  plotSel.append('option').attr('value', '__pairwise_comparison__').text('Distance comparison (scatter)');
+  numCols.forEach(c => plotSel.append('option').attr('value', c).text(c));
+  if (!state.plotCol) {
+    state.plotCol = '__pairwise__';
+    plotSel.property('value', '__pairwise__');
   }
 
   if (defaultColorCol && state.metaCols.includes(defaultColorCol)) {

@@ -2,24 +2,25 @@ import * as d3 from 'https://cdn.jsdelivr.net/npm/d3@7/+esm';
 import { state } from './state.js';
 
 /* ══════════════════════════════════════════════════════════════════════════
-   BOXPLOT  (sidebar panel — driven by a specific treeState)
+   PLOT PANEL  (sidebar — renders whichever plot #plot-select is set to)
+   '__pairwise_comparison__' → scatter; anything else → box plot.
 ══════════════════════════════════════════════════════════════════════════ */
-/* Boxplot always reflects the primary (left) tree — state.primaryTree. */
-export function drawBoxplot() {
+/* The panel always reflects the primary (left) tree — state.primaryTree. */
+export function drawPlotPanel() {
   const treeState = state.primaryTree;
   const panel     = document.getElementById('left-panel');
-  const container = d3.select('#boxplot');
+  const container = d3.select('#plot-canvas');
   container.selectAll('*').remove();
 
   if (panel.offsetWidth < 20) return;
 
-  if (!state.boxplotCol) {
-    container.append('div').attr('class', 'bp-placeholder').text('Choose a variable above to plot.');
+  if (!state.plotCol) {
+    container.append('div').attr('class', 'plot-placeholder').text('Choose a variable above to plot.');
     return;
   }
 
   // Pairwise comparison uses ALL (filtered) tips — no selection required.
-  if (state.boxplotCol === '__pairwise_comparison__') {
+  if (state.plotCol === '__pairwise_comparison__') {
     drawPairwiseScatter(container, treeState, panel);
     return;
   }
@@ -30,7 +31,7 @@ export function drawBoxplot() {
   const hasSelection = treeState.selectedNames.size > 0;
 
   if (!hasFilter && !hasSelection) {
-    container.append('div').attr('class', 'bp-placeholder').text('Select tips in the tree to see the distribution.');
+    container.append('div').attr('class', 'plot-placeholder').text('Select tips in the tree to see the distribution.');
     return;
   }
 
@@ -41,13 +42,13 @@ export function drawBoxplot() {
 
   const isCat = state.colorScale && typeof state.colorScale.domain()[0] === 'string' && state.currentColorCol;
   let pts = [];
-  let yLabel = state.boxplotCol;
+  let yLabel = state.plotCol;
 
-  if (state.boxplotCol === '__pairwise__') {
+  if (state.plotCol === '__pairwise__') {
     yLabel = 'Cophenetic distance';
     const selLeaves = effectiveLeaves;
     if (selLeaves.length < 2) {
-      container.append('div').attr('class', 'bp-placeholder').text('Select at least 2 tips to compute pairwise distances.');
+      container.append('div').attr('class', 'plot-placeholder').text('Select at least 2 tips to compute pairwise distances.');
       return;
     }
     for (let i = 0; i < selLeaves.length; i++) {
@@ -67,21 +68,21 @@ export function drawBoxplot() {
     }
   } else {
     if (!state.currentMeta) {
-      container.append('div').attr('class', 'bp-placeholder').text('Load metadata to plot this variable.');
+      container.append('div').attr('class', 'plot-placeholder').text('Load metadata to plot this variable.');
       return;
     }
     pts = effectiveLeaves.flatMap(leaf => {
       const name = leaf.data.name;
       const row  = state.currentMeta.get(name);
       if (!row) return [];
-      const val = +row[state.boxplotCol];
+      const val = +row[state.plotCol];
       if (isNaN(val)) return [];
       return [{ val, cat: isCat ? (row[state.currentColorCol] || '?') : 'All' }];
     });
   }
 
   if (!pts.length) {
-    container.append('div').attr('class', 'bp-placeholder').text('No data for selected tips.');
+    container.append('div').attr('class', 'plot-placeholder').text('No data for selected tips.');
     return;
   }
 
@@ -166,27 +167,39 @@ function drawPairwiseScatter(container, treeState, panel) {
   const tree2 = state.secondaryTree;
 
   if (!tree2 || !tree2._leaves || tree2._leaves.length === 0) {
-    container.append('div').attr('class', 'bp-placeholder')
+    container.append('div').attr('class', 'plot-placeholder')
       .text('Load a comparison tree to enable this plot.');
     return;
   }
   if (!state.currentColorCol || !state.currentMeta) {
-    container.append('div').attr('class', 'bp-placeholder')
+    container.append('div').attr('class', 'plot-placeholder')
       .text('Select a colour column to match samples to genomes.');
     return;
   }
 
-  // Use ALL leaves — no selection required.
-  const allLeaves = treeState?._leaves || [];
-  if (allLeaves.length < 2) {
-    container.append('div').attr('class', 'bp-placeholder')
+  // Use all tips that pass the current filter — no selection required.
+  const treeLeaves = treeState?._leaves || [];
+  if (treeLeaves.length < 2) {
+    container.append('div').attr('class', 'plot-placeholder')
       .text('Load a prediction tree first.');
     return;
   }
 
-  // genome → tree2 leaf node (pre-cached ancestors for LCA)
+  const fln       = treeState.filteredLeafNames; // Set<name> | null
+  const allLeaves = fln ? treeLeaves.filter(l => fln.has(l.data.name)) : treeLeaves;
+  if (allLeaves.length < 2) {
+    container.append('div').attr('class', 'plot-placeholder')
+      .text('Fewer than 2 tips pass the current filter.');
+    return;
+  }
+
+  // genome → tree2 leaf node (pre-cached ancestors for LCA), filter-aware
+  const fln2  = tree2.filteredLeafNames; // Set<name> | null
   const t2map = new Map();
-  for (const leaf of tree2._leaves) t2map.set(leaf.data.name.trim(), leaf);
+  for (const leaf of tree2._leaves) {
+    if (fln2 && !fln2.has(leaf.data.name)) continue;
+    t2map.set(leaf.data.name.trim(), leaf);
+  }
 
   // Pre-cache tree2 ancestors per leaf for O(depth) LCA lookups
   const t2ancs = new Map();
@@ -234,8 +247,9 @@ function drawPairwiseScatter(container, treeState, panel) {
   }
 
   if (!pts.length) {
-    container.append('div').attr('class', 'bp-placeholder')
-      .text('No matching genome pairs found between the two trees.');
+    container.append('div').attr('class', 'plot-placeholder')
+      .text(fln ? 'No matching genome pairs among the filtered tips.'
+                : 'No matching genome pairs found between the two trees.');
     return;
   }
 
@@ -304,4 +318,12 @@ function drawPairwiseScatter(container, treeState, panel) {
     .attr('x', W).attr('y', -10)
     .attr('text-anchor', 'end').attr('font-size', 9).attr('fill', '#334155')
     .text(`r = ${d3.format('.3f')(pearsonR)}  ·  ${d3.format(',')(n)} pairs  (${d3.format(',')(nSame)} intra-genome)`);
+
+  // Filter indicator: how many tips the plot is built from.
+  if (fln) {
+    svg.append('text')
+      .attr('x', 0).attr('y', -10)
+      .attr('font-size', 9).attr('fill', '#b45309')
+      .text(`filtered: ${d3.format(',')(allLeaves.length)}/${d3.format(',')(treeLeaves.length)} tips`);
+  }
 }

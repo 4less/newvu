@@ -705,7 +705,7 @@ svg { display: block; }
   font-family: var(--font-mono);
 }
 
-/* ── Boxplot divider / sidebar toggle ────────────────────────────────────── */
+/* ── Plot divider / sidebar toggle ───────────────────────────────────────── */
 #divider {
   width: 6px;
   background: var(--outline-v);
@@ -737,7 +737,7 @@ svg { display: block; }
 }
 #toggle-btn:hover { background: var(--surface-highest); }
 
-/* ── Boxplot sidebar ─────────────────────────────────────────────────────── */
+/* ── Plot sidebar ────────────────────────────────────────────────────────── */
 #left-panel {
   width: 0;
   min-width: 0;
@@ -763,9 +763,9 @@ svg { display: block; }
 }
 #left-header select { font-size: 11px; height: 24px; flex: 1; }
 
-#boxplot { flex: 1; min-height: 0; overflow: hidden; padding: 12px; }
+#plot-canvas { flex: 1; min-height: 0; overflow: hidden; padding: 12px; }
 
-.bp-placeholder {
+.plot-placeholder {
   padding: 18px 14px;
   font-size: 12px;
   color: var(--outline);

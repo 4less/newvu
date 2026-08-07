@@ -1,6 +1,6 @@
 import * as d3 from 'https://cdn.jsdelivr.net/npm/d3@7/+esm';
 import { state } from './state.js';
-import { drawBoxplot } from './boxplot.js';
+import { drawPlotPanel } from './plotPanel.js';
 
 /* ══════════════════════════════════════════════════════════════════════════
    SELECTION STATS  (operates on a specific treeState instance)
@@ -13,12 +13,12 @@ export function updateStats(treeState) {
 
   if (nodes.length === 0) {
     info.html('No tips selected &nbsp;·&nbsp; click a tip, click an edge, or drag a rectangle to select.');
-    drawBoxplot();
+    drawPlotPanel();
     return;
   }
   if (nodes.length === 1) {
     info.html(`<strong>1 tip selected:</strong> ${nodes[0].data.name} &nbsp;·&nbsp; select at least one more to see distances.`);
-    drawBoxplot();
+    drawPlotPanel();
     return;
   }
 
@@ -39,7 +39,7 @@ export function updateStats(treeState) {
     `median <strong>${fmt(d3.median(dists))}</strong> &nbsp;·&nbsp; ` +
     `mean <strong>${fmt(d3.mean(dists))}</strong>`
   );
-  drawBoxplot();
+  drawPlotPanel();
 
   // Sync tree 2 selection whenever tree 1's selection changes (one-way).
   if (treeState === state.primaryTree && typeof state.onPrimarySelectionChange === 'function') {
