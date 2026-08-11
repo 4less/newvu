@@ -696,6 +696,13 @@ button:hover { background: var(--primary-dk); }
 }
 svg { display: block; }
 
+/* Shown in place of the tree when every tip is filtered out */
+.tree-empty {
+  padding: 26px 18px;
+  font-size: 12px;
+  color: var(--outline);
+}
+
 /* ── SVG tree elements ───────────────────────────────────────────────────── */
 .link     { fill: none; stroke: var(--outline-v); stroke-width: 0.9px; }
 .link-hit { fill: none; stroke: transparent; stroke-width: 10px; cursor: pointer; }

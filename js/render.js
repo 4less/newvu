@@ -1,6 +1,6 @@
 import * as d3 from 'https://cdn.jsdelivr.net/npm/d3@7/+esm';
 import { state } from './state.js';
-import { buildHierarchy } from './newick.js';
+import { buildHierarchy, pruneTree, leafNames } from './newick.js';
 import { updateStats, clearSelection } from './stats.js';
 import { SHAPES } from './meta.js';
 
@@ -90,14 +90,40 @@ function buildLegend() {
 export function draw(treeState, containerId = 'tree') {
   const circular = treeState.circularLayout;
 
-  const root    = buildHierarchy(treeState.currentData);
+  const container = document.getElementById(containerId);
+  if (!container) return;
+
+  // Full leaf set of the unfiltered tree — filters are always evaluated
+  // against this, so relaxing a filter brings tips back.
+  treeState._allLeafNames = leafNames(treeState.currentData);
+
+  /* ── Filter: prune the tree, then lay out what is left ──────────────── */
+  // Removing tips also removes the branches that led to them; unary internal
+  // nodes are collapsed (branch lengths merged), so the layout below is
+  // recomputed from scratch on every filter change.
+  const fln  = treeState.filteredLeafNames; // Set<name> | null
+  const data = fln ? pruneTree(treeState.currentData, fln) : treeState.currentData;
+
+  d3.select(`#${containerId}`).selectAll('svg, .tree-empty').remove();
+
+  if (!data) {
+    treeState._leaves = [];
+    treeState._tipG   = null;
+    container.style.overflow = 'hidden';
+    d3.select(`#${containerId}`).append('div')
+      .attr('class', 'tree-empty')
+      .text('No tips match the current filters');
+    buildLegend();
+    updateStats(treeState);
+    return;
+  }
+
+  const root    = buildHierarchy(data);
   const leaves  = root.leaves();
   treeState._leaves = leaves;
   const nLeaves = leaves.length;
-  const maxDist = d3.max(leaves, d => d.dist);
-
-  const container = document.getElementById(containerId);
-  if (!container) return;
+  const rawMaxDist = d3.max(leaves, d => d.dist) || 0;
+  const maxDist    = rawMaxDist > 0 ? rawMaxDist : 1;  // guard single-tip / zero-length trees
 
   /* ── Layout ───────────────────────────────────────────────────────────── */
   const spacing = 10;
@@ -138,19 +164,6 @@ export function draw(treeState, containerId = 'tree') {
   const _scale  = circular ? Math.max(0.3, Math.min(1.5, Math.min(container.clientWidth, container.clientHeight) / _refDim)) : 1;
   const effectiveFontSize = Math.max(4, Math.round(state.tipFontSize * _scale));
   const effectiveTipSize  = Math.max(6, Math.round(state.tipSize  * _scale));
-
-  /* ── Filter: bottom-up pass to mark nodes with ≥1 passing leaf ─────── */
-  const fln = treeState.filteredLeafNames; // Set<name> | null
-  if (fln) {
-    // eachAfter visits children before parents, so parent can derive from children.
-    root.eachAfter(node => {
-      if (!node.children) {
-        node._anyPass = fln.has(node.data.name);
-      } else {
-        node._anyPass = node.children.some(c => c._anyPass);
-      }
-    });
-  }
 
   /* ── Node positions ───────────────────────────────────────────────────── */
   root.each(node => {
@@ -234,7 +247,6 @@ export function draw(treeState, containerId = 'tree') {
   }
 
   /* ── SVG ──────────────────────────────────────────────────────────────── */
-  d3.select(`#${containerId}`).selectAll('svg').remove();
   const svgEl = d3.select(`#${containerId}`).append('svg')
     .attr('width', svgW).attr('height', svgH)
     .classed('circular',      circular)
@@ -323,16 +335,15 @@ export function draw(treeState, containerId = 'tree') {
   brushG.call(brush);
 
   /* ── Links ────────────────────────────────────────────────────────────── */
-  // Only render branches for nodes that have at least one passing leaf.
-  const branchNodes  = root.descendants().slice(1);
-  const visibleBranches = fln ? branchNodes.filter(d => d._anyPass) : branchNodes;
+  // The tree is already pruned, so every branch here belongs to the layout.
+  const branches = root.descendants().slice(1);
 
   svg.selectAll('.link')
-    .data(visibleBranches)
+    .data(branches)
     .join('path').attr('class', 'link').attr('d', linkPath);
 
   svg.selectAll('.link-hit')
-    .data(visibleBranches)
+    .data(branches)
     .join('path')
       .attr('class', 'link-hit').attr('d', linkPath)
       .on('click', function(event, d) {
@@ -344,17 +355,15 @@ export function draw(treeState, containerId = 'tree') {
 
   /* ── Internal node dots ───────────────────────────────────────────────── */
   svg.selectAll('.inode')
-    .data(root.descendants().filter(d => d.children && (!fln || d._anyPass)))
+    .data(root.descendants().filter(d => d.children))
     .join('circle')
       .attr('class', 'inode')
       .attr('cx', d => d.px).attr('cy', d => d.py)
       .attr('r', 1.5).attr('fill', '#cbd5e1');
 
-  /* ── Tips — only render leaves that pass the filter ─────────────────── */
-  const visibleLeaves = fln ? leaves.filter(l => fln.has(l.data.name)) : leaves;
-
+  /* ── Tips ─────────────────────────────────────────────────────────────── */
   const tipG = svg.selectAll('.tip')
-    .data(visibleLeaves)
+    .data(leaves)
     .join('g')
       .attr('class', 'tip')
       .attr('transform', d => `translate(${d.px},${d.py})`);
@@ -413,7 +422,7 @@ export function draw(treeState, containerId = 'tree') {
 
   /* ── Scale bar ────────────────────────────────────────────────────────── */
   const scaleVal = +d3.format('.2g')(maxDist * 0.1);
-  const barG = svg.append('g').attr('class', 'scalebar');
+  const barG = svg.append('g').attr('class', 'scalebar').classed('hidden', rawMaxDist <= 0);
 
   if (circular) {
     const barW = rScale(scaleVal), barY = maxR + 20;

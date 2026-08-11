@@ -187,7 +187,9 @@ function applyFilters(andRedraw = true) {
   tree1.filteredLeafNames = passing;
 
   // Tree2: retain only genomes represented by at least one passing tree1 tip.
-  if (passing !== null && tree2._leaves && tree2._leaves.length > 0) {
+  // Uses tree2's full leaf set, not the pruned one currently on screen.
+  const tree2All = tree2._allLeafNames || (tree2._leaves || []).map(l => l.data.name);
+  if (passing !== null && tree2All.length > 0) {
     const genomes = new Set();
     for (const name of passing) {
       const genome = state.currentMeta?.get(name.trim())?.[state.currentColorCol]?.trim();
@@ -195,7 +197,7 @@ function applyFilters(andRedraw = true) {
     }
     if (genomes.size > 0) {
       tree2.filteredLeafNames = new Set(
-        tree2._leaves.map(l => l.data.name).filter(n => {
+        tree2All.filter(n => {
           const t = n.trim();
           if (genomes.has(t)) return true;
           // also try stripping trailing version suffix (e.g. .1)

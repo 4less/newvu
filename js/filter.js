@@ -5,7 +5,7 @@ import { state } from './state.js';
    FILTER STATE
 ══════════════════════════════════════════════════════════════════════════ */
 let _filters  = [];    // [{col, type, min, max, dataMin, dataMax, values, allValues}]
-let _live     = false; // global live-update toggle
+let _live     = true;  // global live-update toggle — re-layout on every change
 let _onChange = null;  // (applyNow: bool) => void — wired by main.js
 
 export function setFilterOnChange(fn) { _onChange = fn; }
@@ -16,11 +16,16 @@ export function hasActiveFilters()    { return _filters.length > 0; }
    FILTER LOGIC
 ══════════════════════════════════════════════════════════════════════════ */
 export function computePassingNames(treeState) {
-  if (!treeState?._leaves || _filters.length === 0) return null;
+  // Always evaluate against the FULL leaf set (`_allLeafNames`), never the
+  // currently drawn one — the drawn tree is pruned, so filtering it again
+  // would make every change irreversible.
+  const all = treeState?._allLeafNames
+           ?? (treeState?._leaves || []).map(l => l.data.name);
+  if (all.length === 0 || _filters.length === 0) return null;
   const passing = new Set();
-  for (const leaf of treeState._leaves) {
-    const row = state.currentMeta?.get(leaf.data.name.trim());
-    if (_filters.every(f => _passes(row, f))) passing.add(leaf.data.name);
+  for (const name of all) {
+    const row = state.currentMeta?.get(name.trim());
+    if (_filters.every(f => _passes(row, f))) passing.add(name);
   }
   return passing;
 }

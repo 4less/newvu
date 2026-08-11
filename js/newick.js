@@ -46,6 +46,44 @@ export function buildHierarchy(data) {
 }
 
 /* ══════════════════════════════════════════════════════════════════════════
+   LEAF NAMES  (plain-data walk — no d3.hierarchy needed)
+══════════════════════════════════════════════════════════════════════════ */
+export function leafNames(data, out = []) {
+  if (!data) return out;
+  if (!data.children || data.children.length === 0) { out.push(data.name); return out; }
+  data.children.forEach(c => leafNames(c, out));
+  return out;
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   PRUNE
+   Returns a new plain-data tree containing only the leaves in `keepNames`.
+   Internal nodes that end up with a single child are collapsed and their
+   branch length merged into that child, so the remaining topology and all
+   root-to-tip distances stay correct.  Returns null if nothing is kept.
+══════════════════════════════════════════════════════════════════════════ */
+export function pruneTree(data, keepNames) {
+  function rec(node) {
+    if (!node.children || node.children.length === 0)
+      return keepNames.has(node.name) ? { name: node.name, len: node.len, children: [] } : null;
+
+    const kids = [];
+    for (const c of node.children) {
+      const k = rec(c);
+      if (k) kids.push(k);
+    }
+    if (kids.length === 0) return null;
+    if (kids.length === 1) {
+      // Unary node — splice it out, adding its branch to the surviving child.
+      kids[0].len += node.len;
+      return kids[0];
+    }
+    return { name: node.name, len: node.len, children: kids };
+  }
+  return rec(data);
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
    MIDPOINT ROOTING
    Handles trifurcating roots: when we invert through the original root,
    it keeps all its remaining children (2 if trifurcating → proper bifurcation).

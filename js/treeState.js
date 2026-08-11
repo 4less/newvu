@@ -14,6 +14,7 @@ export function createTreeState() {
     selectedNames:      new Set(),
     filteredLeafNames:  null,  // Set<name> of tips that pass current filters; null = no filter
     _tipG:           null,   // live d3 selection of tip <g> elements
-    _leaves:         null,   // live array of hierarchy leaf nodes
+    _leaves:         null,   // live array of hierarchy leaf nodes (of the PRUNED tree)
+    _allLeafNames:   null,   // every leaf name of the unfiltered tree
   };
 }
