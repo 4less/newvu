@@ -263,7 +263,14 @@ export function draw(treeState, containerId = 'tree') {
       if (state.activeTool === 'pan')    return !event.button;
       return event.ctrlKey && !event.button;
     })
-    .wheelDelta(event => -event.deltaY * (event.deltaMode === 1 ? 0.02 : event.deltaMode ? 1 : 0.0005))
+    .wheelDelta(event => {
+      // Touchpad pinch arrives as a ctrl+wheel with small deltas, so it needs
+      // a much larger factor than a mouse wheel to feel responsive. The clamp
+      // keeps one fast gesture from jumping several octaves at once.
+      const perLine = event.deltaMode === 1 ? 0.05 : event.deltaMode ? 1 : 0.002;
+      const d = -event.deltaY * (event.ctrlKey ? 0.01 : perLine);
+      return Math.max(-0.6, Math.min(0.6, d));
+    })
     .scaleExtent([0.1, 10])
     .on('zoom', event => {
       treeState.zoomTransform = event.transform;
@@ -271,6 +278,26 @@ export function draw(treeState, containerId = 'tree') {
     });
 
   svgEl.call(zoom).call(zoom.transform, treeState.zoomTransform ?? initTransform);
+
+  /* ── Touchpad: two-finger pan ─────────────────────────────────────────── */
+  // A pinch reaches us as a wheel event with ctrlKey set — the zoom filter
+  // above takes those. A plain two-finger scroll has no ctrlKey: pan with it,
+  // unless the canvas still has native scroll room in that axis (tall
+  // rectangular trees), where scrolling is the better behaviour.
+  // preventDefault() also stops horizontal swipes from triggering the
+  // browser's back-navigation gesture.
+  svgEl.on('wheel.pan', function (event) {
+    if (event.ctrlKey) return;                       // pinch → handled by zoom
+    const unit = event.deltaMode === 1 ? 16 : event.deltaMode === 2 ? container.clientHeight : 1;
+    const dx = event.deltaX * unit, dy = event.deltaY * unit;
+    const vertical = Math.abs(dy) >= Math.abs(dx);
+    const roomY = container.scrollHeight - container.clientHeight > 1;
+    const roomX = container.scrollWidth  - container.clientWidth  > 1;
+    if (vertical ? roomY : roomX) return;            // let the canvas scroll
+    event.preventDefault();
+    const t = treeState.zoomTransform ?? initTransform;
+    svgEl.call(zoom.transform, t.translate(-dx / t.k, -dy / t.k));
+  });
 
   // Remove D3's default dblclick-zoom; replace with full reset
   svgEl.on('dblclick.zoom', null);

@@ -35,6 +35,7 @@ body {
   display: flex;
   flex-direction: column;
   overflow: hidden;
+  overscroll-behavior: none;   /* no swipe-to-navigate anywhere in the app */
 }
 
 .hidden { display: none !important; }
@@ -796,6 +797,9 @@ button:hover { background: var(--primary-dk); }
   min-height: 0;
   overflow: auto;
   position: relative;
+  /* Keep two-finger swipes inside the canvas — otherwise a horizontal
+     overscroll triggers the browser's back-navigation gesture. */
+  overscroll-behavior: contain;
 }
 svg { display: block; }
 
