@@ -77,12 +77,20 @@ export function initFilterPanel() {
   if (!inner) return;
   _render();
 
-  // Toggle open/closed
-  document.getElementById('filter-toggle-btn')?.addEventListener('click', () => {
+  // Toggle open/closed — the canvas controls slide aside with the card so the
+  // filter button stays reachable.
+  const setOpen = open => {
     const panel = document.getElementById('filter-panel');
-    const isOpen = panel.classList.toggle('fp-open');
-    _updateToggleBtn(isOpen);
+    if (!panel) return;
+    panel.classList.toggle('fp-open', open);
+    panel.parentElement?.classList.toggle('fp-shifted', open);
+    _updateToggleBtn(open);
+  };
+
+  document.getElementById('filter-toggle-btn')?.addEventListener('click', () => {
+    setOpen(!document.getElementById('filter-panel')?.classList.contains('fp-open'));
   });
+  document.getElementById('filter-close')?.addEventListener('click', () => setOpen(false));
 }
 
 export function refreshFilterOptions() {
@@ -95,10 +103,10 @@ function _updateToggleBtn(open) {
   if (!btn) return;
   const n = _filters.length;
   btn.innerHTML =
-    `<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/></svg>` +
-    ` Filter` +
-    (n > 0 ? ` <span class="filter-badge">${n}</span>` : '');
-  btn.classList.toggle('fp-active', n > 0);
+    `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/></svg>` +
+    (n > 0 ? `<span class="filter-badge">${n}</span>` : '');
+  btn.classList.toggle('fp-active', n > 0 || !!open);
+  btn.title = (open ? 'Hide' : 'Show') + ' filters' + (n > 0 ? ` (${n} active)` : '');
 }
 
 function _render() {
@@ -164,39 +172,62 @@ function _buildItem(f) {
 function _buildNumeric(f) {
   const fmt  = d3.format('.4g');
   const span = f.dataMax - f.dataMin || 1;
+  const pos  = v => Math.round((v - f.dataMin) / span * 1000);   // value → slider step
   const wrap = _el('div', 'fp-numeric');
 
-  // Current range display
-  const valRow  = _el('div', 'fp-val-row');
-  const minSpan = Object.assign(_el('span', 'fp-val'), { textContent: fmt(f.min) });
-  const maxSpan = Object.assign(_el('span', 'fp-val'), { textContent: fmt(f.max) });
-  valRow.append(minSpan, Object.assign(_el('span'), { textContent: '–' }), maxSpan);
+  // Editable min / max fields — interchangeable with the slider below
+  const valRow = _el('div', 'fp-val-row');
+  const minInp = _numInput(f, fmt(f.min));
+  const maxInp = _numInput(f, fmt(f.max));
+  valRow.append(minInp, Object.assign(_el('span', 'fp-val-dash'), { textContent: '–' }), maxInp);
 
   // Dual range slider
   const track = _el('div', 'fp-slider-track');
-
-  const minS = _rangeInput(Math.round((f.min - f.dataMin) / span * 1000));
-  const maxS = _rangeInput(Math.round((f.max - f.dataMin) / span * 1000));
+  const minS  = _rangeInput(pos(f.min));
+  const maxS  = _rangeInput(pos(f.max));
   minS.classList.add('fp-slider-min');
   maxS.classList.add('fp-slider-max');
 
-  function sync() {
+  // Reflect f.min / f.max into every control. `typing` skips the field the
+  // user is editing so their text isn't reformatted mid-entry.
+  function paint(typing = false) {
+    minS.value = pos(f.min);
+    maxS.value = pos(f.max);
+    track.style.setProperty('--lo', (pos(f.min) / 10) + '%');
+    track.style.setProperty('--hi', (pos(f.max) / 10) + '%');
+    if (!typing) { minInp.value = fmt(f.min); maxInp.value = fmt(f.max); }
+  }
+
+  function fromSliders() {
     let lo = +minS.value, hi = +maxS.value;
-    if (lo > hi) { const t = lo; lo = hi; hi = t; minS.value = lo; maxS.value = hi; }
+    if (lo > hi) { const t = lo; lo = hi; hi = t; }
     f.min = f.dataMin + lo / 1000 * span;
     f.max = f.dataMin + hi / 1000 * span;
-    minSpan.textContent = fmt(f.min);
-    maxSpan.textContent = fmt(f.max);
-    track.style.setProperty('--lo', (lo / 10) + '%');
-    track.style.setProperty('--hi', (hi / 10) + '%');
+    paint();
     if (_live) _onChange?.(true);
   }
 
-  minS.addEventListener('input', sync);
-  maxS.addEventListener('input', sync);
-  track.style.setProperty('--lo', (Math.round((f.min - f.dataMin) / span * 1000) / 10) + '%');
-  track.style.setProperty('--hi', (Math.round((f.max - f.dataMin) / span * 1000) / 10) + '%');
+  function fromFields() {
+    const clamp = v => Math.min(f.dataMax, Math.max(f.dataMin, v));
+    let lo = parseFloat(minInp.value), hi = parseFloat(maxInp.value);
+    lo = isNaN(lo) ? f.min : clamp(lo);
+    hi = isNaN(hi) ? f.max : clamp(hi);
+    if (lo > hi) { const t = lo; lo = hi; hi = t; }
+    f.min = lo;
+    f.max = hi;
+    paint(true);
+    if (_live) _onChange?.(true);
+  }
 
+  minS.addEventListener('input', fromSliders);
+  maxS.addEventListener('input', fromSliders);
+  // `change` fires on Enter / blur — not on every keystroke.
+  minInp.addEventListener('change', fromFields);
+  maxInp.addEventListener('change', fromFields);
+  minInp.addEventListener('blur', () => paint());
+  maxInp.addEventListener('blur', () => paint());
+
+  paint();
   track.append(minS, maxS);
   wrap.append(valRow, track);
   return wrap;
@@ -240,6 +271,18 @@ function _btn(text, cls) {
 }
 function _opt(val, text) {
   return Object.assign(document.createElement('option'), { value: val, textContent: text });
+}
+function _numInput(f, val) {
+  const span = f.dataMax - f.dataMin || 1;
+  return Object.assign(document.createElement('input'), {
+    type: 'number',
+    className: 'fp-num',
+    step: (span / 100).toPrecision(2),
+    min: f.dataMin,
+    max: f.dataMax,
+    value: val,
+    title: `${d3.format('.4g')(f.dataMin)} – ${d3.format('.4g')(f.dataMax)}`,
+  });
 }
 function _rangeInput(val) {
   return Object.assign(document.createElement('input'), {

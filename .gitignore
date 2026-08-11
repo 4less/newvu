@@ -13,3 +13,6 @@ Thumbs.db
 
 stitch_newvu_newick_tree_viewer
 d3_test.html
+
+# Python
+__pycache__/

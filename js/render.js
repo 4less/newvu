@@ -399,14 +399,19 @@ export function draw(treeState, containerId = 'tree') {
   });
 
   const tooltip = d3.select('#tooltip');
+
+  // Long values are clipped from the LEFT — the tail carries the information
+  // (accessions, paths, sample suffixes), so keep the end and drop the head.
+  const clipStart = (s, n = 44) => (s.length > n ? '…' + s.slice(-n) : s);
+
   tipG
     .on('mouseover', function(event, d) {
       const name = d.data.name;
       const row  = state.currentMeta ? state.currentMeta.get(name) : null;
-      let html = `<strong>${name}</strong>`;
+      let html = `<strong>${clipStart(name, 52)}</strong>`;
       if (row && state.metaCols.length) {
         html += '<table>' + state.metaCols.map(col =>
-          `<tr><td>${col}</td><td>${row[col] ?? ''}</td></tr>`
+          `<tr><td>${clipStart(col, 24)}</td><td>${clipStart(String(row[col] ?? ''))}</td></tr>`
         ).join('') + '</table>';
       }
       tooltip.html(html).style('display', 'block');

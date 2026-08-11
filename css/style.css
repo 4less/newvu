@@ -287,7 +287,7 @@ button:hover { background: var(--primary-dk); }
   padding: 8px 12px;
   font-size: 11px;
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
-  max-width: 280px;
+  max-width: 460px;
 }
 #tooltip strong {
   display: block;
@@ -296,10 +296,12 @@ button:hover { background: var(--primary-dk); }
   font-weight: 600;
   color: var(--on-surface);
   font-family: var(--font-mono);
+  white-space: nowrap;
 }
-#tooltip table { border-collapse: collapse; }
+#tooltip table { border-collapse: collapse; width: 100%; }
 #tooltip td { padding: 1px 4px; vertical-align: top; font-family: var(--font-mono); font-size: 11px; }
 #tooltip td:first-child { color: var(--outline); white-space: nowrap; padding-right: 10px; }
+#tooltip td:last-child  { white-space: nowrap; }
 
 /* ══════════════════════════════════════════════════════════════════════════
    Main workspace
@@ -437,18 +439,59 @@ button:hover { background: var(--primary-dk); }
   margin-left: 2px;
 }
 
-/* ── Filter toggle button ────────────────────────────────────────────────── */
-.filter-toggle-btn {
-  font-size: 11px;
-  padding: 0 9px;
-  gap: 5px;
-  white-space: nowrap;
-  background: var(--surface-lowest);
-  color: var(--on-sv);
-  border: 1px solid var(--outline-v);
+/* ── Controls floating on the canvas (top-left, stacked vertically) ─────── */
+.canvas-controls {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  z-index: 30;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+  transition: transform 180ms ease;
 }
-.filter-toggle-btn:hover { background: var(--surface); color: var(--on-surface); }
-.tree-subbar .filter-toggle-btn { height: 22px; }
+/* Shifted aside while the filter card is open, so it stays reachable */
+.tree-body.fp-shifted .canvas-controls { transform: translateX(258px); }
+
+.canvas-chk,
+.canvas-btn {
+  height: 34px;
+  background: rgba(255, 255, 255, 0.95);
+  border: 1px solid var(--outline-v);
+  border-radius: 7px;
+  box-shadow: 0 1px 4px rgba(15, 23, 42, 0.10);
+  color: var(--on-surface);
+  flex-shrink: 0;
+}
+
+.canvas-chk {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 13px;
+  font-size: 13px;
+  cursor: pointer;
+  user-select: none;
+  white-space: nowrap;
+}
+.canvas-chk:hover { background: #fff; border-color: var(--outline); }
+.canvas-chk input[type="checkbox"] { width: 15px; height: 15px; }
+
+/* Filter toggle — icon button, same floating card style */
+.canvas-btn {
+  position: relative;
+  width: 38px;
+  padding: 0;
+  color: var(--on-sv);
+}
+.canvas-btn:hover { background: #fff; color: var(--on-surface); border-color: var(--outline); }
+.canvas-btn.fp-active {
+  background: var(--primary);
+  color: var(--on-primary);
+  border-color: var(--primary);
+}
+.canvas-btn.fp-active:hover { background: var(--primary-dk); color: var(--on-primary); }
 .filter-toggle-btn.fp-active {
   background: rgba(79, 70, 229, 0.08);
   color: var(--primary);
@@ -456,7 +499,12 @@ button:hover { background: var(--primary-dk); }
 }
 .filter-toggle-btn.fp-active:hover { background: rgba(79, 70, 229, 0.15); }
 
+/* Count badge — pinned to the corner of the icon button */
 .filter-badge {
+  position: absolute;
+  top: -5px;
+  right: -5px;
+  border: 1.5px solid #fff;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -469,27 +517,53 @@ button:hover { background: var(--primary-dk); }
   height: 14px;
   padding: 0 3px;
   line-height: 1;
-  vertical-align: middle;
-  margin-left: 2px;
 }
 
-/* ── Filter panel (collapsible strip) ───────────────────────────────────── */
+/* ── Filter panel — card sliding in from the left, over the canvas ─────── */
 .filter-panel {
-  display: grid;
-  grid-template-rows: 0fr;
-  transition: grid-template-rows 200ms ease;
+  position: absolute;
+  top: 10px;
+  bottom: 10px;
+  left: 10px;
+  width: 244px;
+  z-index: 20;
+  display: flex;
+  flex-direction: column;
   background: var(--surface-low);
-  border-bottom: 1px solid transparent;
-  flex-shrink: 0;
+  border: 1px solid var(--outline-v);
+  border-radius: 8px;
+  box-shadow: 0 4px 18px rgba(15, 23, 42, 0.16);
+  transform: translateX(calc(-100% - 14px));
+  visibility: hidden;
+  transition: transform 180ms ease, visibility 180ms;
 }
 .filter-panel.fp-open {
-  grid-template-rows: 1fr;
-  border-bottom-color: var(--outline-v);
+  transform: none;
+  visibility: visible;
 }
+
+.fp-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  padding: 6px 8px 6px 10px;
+  border-bottom: 1px solid var(--outline-v);
+  flex-shrink: 0;
+}
+.fp-head-title {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--outline);
+}
+.fp-close { width: 22px; height: 22px; }
+
 .fp-inner {
+  flex: 1;
   min-height: 0;
   overflow-y: auto;
-  max-height: 300px;
   padding: 8px 10px;
   display: flex;
   flex-direction: column;
@@ -537,12 +611,32 @@ button:hover { background: var(--primary-dk); }
 .fp-val-row {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  gap: 6px;
   font-size: 10px;
   font-family: var(--font-mono);
   color: var(--on-sv);
 }
-.fp-val { font-weight: 500; }
+.fp-val-dash { color: var(--outline); flex-shrink: 0; }
+
+/* Editable min / max fields — kept in sync with the slider */
+.fp-num {
+  flex: 1;
+  min-width: 0;
+  width: 100%;
+  height: 24px;
+  padding: 0 4px 0 6px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--on-surface);
+  background: var(--surface-lowest);
+  border: 1px solid var(--outline-v);
+  border-radius: 4px;
+  outline: none;
+}
+.fp-num:focus {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 2px rgba(79, 70, 229, 0.18);
+}
 
 /* Dual-handle range slider */
 .fp-slider-track {
@@ -686,6 +780,15 @@ button:hover { background: var(--primary-dk); }
   flex-shrink: 0;
 }
 .btn-svg-export:hover { background: var(--surface-low); }
+
+/* Canvas area — positioning context for the filter overlay */
+.tree-body {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  overflow: hidden;
+}
 
 /* Tree canvas */
 .tree-canvas {

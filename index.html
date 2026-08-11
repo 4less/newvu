@@ -149,18 +149,25 @@
       <div class="tree-subbar">
         <span class="tree-title" id="title">Roseburia inulinivorans — predicted tree</span>
         <input type="file" id="nwk-upload" accept=".nwk,.newick,.tree,.treefile,.txt" title="Load Newick tree">
-        <div class="tb-sep"></div>
-        <label class="check-label"><input type="checkbox" id="midpoint-chk"> Midpoint</label>
-        <label class="check-label"><input type="checkbox" id="circular-chk"> Circular</label>
-        <div class="tb-sep"></div>
-        <button class="filter-toggle-btn" id="filter-toggle-btn" title="Show/hide filters">⊘ Filter</button>
         <button class="btn-svg-export" id="svg-export1" title="Export as SVG">SVG ↓</button>
       </div>
-      <!-- Filter panel — collapsible, sits between subbar and tree canvas -->
-      <div id="filter-panel" class="filter-panel">
-        <div class="fp-inner" id="filter-inner"></div>
+      <div class="tree-body">
+        <!-- Controls floating over the canvas, top-left -->
+        <div class="canvas-controls">
+          <button class="canvas-btn filter-toggle-btn" id="filter-toggle-btn" title="Show/hide filters"></button>
+          <label class="canvas-chk"><input type="checkbox" id="midpoint-chk"> Midpoint</label>
+          <label class="canvas-chk"><input type="checkbox" id="circular-chk"> Circular</label>
+        </div>
+        <!-- Filter panel — slides in from the left, over the canvas -->
+        <div id="filter-panel" class="filter-panel">
+          <div class="fp-head">
+            <span class="fp-head-title">Filter</span>
+            <button class="btn-icon fp-close" id="filter-close" title="Close filters">✕</button>
+          </div>
+          <div class="fp-inner" id="filter-inner"></div>
+        </div>
+        <div id="tree" class="tree-canvas"></div>
       </div>
-      <div id="tree" class="tree-canvas"></div>
       <div id="legend"></div>
     </div>
 
@@ -169,14 +176,16 @@
       <div class="tree-subbar">
         <span class="tree-title" id="title2">— load a tree to compare —</span>
         <input type="file" id="nwk-upload2" accept=".nwk,.newick,.tree,.treefile,.txt" title="Load Newick tree">
-        <div class="tb-sep"></div>
-        <label class="check-label"><input type="checkbox" id="midpoint-chk2"> Midpoint</label>
-        <label class="check-label"><input type="checkbox" id="circular-chk2"> Circular</label>
-        <div class="tb-sep"></div>
         <button class="btn-svg-export" id="svg-export2" title="Export as SVG">SVG ↓</button>
         <button class="btn-icon subbar-close" id="close-compare-btn" title="Close comparison">✕</button>
       </div>
-      <div id="tree2" class="tree-canvas"></div>
+      <div class="tree-body">
+        <div class="canvas-controls">
+          <label class="canvas-chk"><input type="checkbox" id="midpoint-chk2"> Midpoint</label>
+          <label class="canvas-chk"><input type="checkbox" id="circular-chk2"> Circular</label>
+        </div>
+        <div id="tree2" class="tree-canvas"></div>
+      </div>
     </div>
 
   </div><!-- end #trees-wrapper -->
