@@ -295,8 +295,10 @@ export function draw(treeState, containerId = 'tree') {
     const roomX = container.scrollWidth  - container.clientWidth  > 1;
     if (vertical ? roomY : roomX) return;            // let the canvas scroll
     event.preventDefault();
+    // Tree follows the fingers (drag-style), rather than scroll-style where
+    // the content moves against them.
     const t = treeState.zoomTransform ?? initTransform;
-    svgEl.call(zoom.transform, t.translate(-dx / t.k, -dy / t.k));
+    svgEl.call(zoom.transform, t.translate(dx / t.k, dy / t.k));
   });
 
   // Remove D3's default dblclick-zoom; replace with full reset
