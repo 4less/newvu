@@ -387,6 +387,20 @@ d3.select('#plot-select').on('change', function() {
 });
 
 /* ══════════════════════════════════════════════════════════════════════════
+   MENU SIDEBAR
+══════════════════════════════════════════════════════════════════════════ */
+(function () {
+  const sidebar = document.getElementById('sidebar');
+  const btn     = document.getElementById('menu-toggle');
+
+  btn.addEventListener('click', () => {
+    const collapsed = sidebar.classList.toggle('sb-collapsed');
+    btn.classList.toggle('active', !collapsed);
+    btn.setAttribute('aria-expanded', String(!collapsed));
+  });
+})();
+
+/* ══════════════════════════════════════════════════════════════════════════
    FONT & TIP SIZE
 ══════════════════════════════════════════════════════════════════════════ */
 (function () {
